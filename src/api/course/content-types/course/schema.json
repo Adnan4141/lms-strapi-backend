@@ -17,12 +17,30 @@
     "description": {
       "type": "richtext"
     },
-    "CourseStatus": {
+    "courseStatus": {
       "type": "enumeration",
+      "default": "DRAFT",
       "enum": [
-        "DRAFT,",
+        "DRAFT",
         "PUBLISHED"
       ]
+    },
+    "lessons": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::lesson.lesson",
+      "mappedBy": "course"
+    },
+    "quizzes": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::quiz.quiz",
+      "mappedBy": "course"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     }
   }
 }

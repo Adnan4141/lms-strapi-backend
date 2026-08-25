@@ -22,6 +22,12 @@
     },
     "order": {
       "type": "integer"
+    },
+    "quiz": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::quiz.quiz",
+      "inversedBy": "questions"
     }
   }
 }

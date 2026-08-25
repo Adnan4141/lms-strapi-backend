@@ -1,34 +1,34 @@
 import { factories } from '@strapi/strapi';
 import { getUserRole } from '../../../utils/auth';
 
-export default factories.createCoreController('api::blog-post.blog-post', ({ strapi }) => ({
+export default factories.createCoreController('api::enrollment.enrollment', ({ strapi }) => ({
   async create(ctx) {
-
     const role = await getUserRole(ctx);
-    if (!['admin', 'content_manager'].includes(role)) {
-      return ctx.forbidden('Only Admin and Content Manager can create blog posts.');
+    if (role !== 'student') {
+      return ctx.forbidden('Only students are allowed to enroll in courses.');
     }
+
+    ctx.request.body.data = {
+      ...ctx.request.body.data,
+      student: ctx.state.user.id,
+    };
+
     return await super.create(ctx);
   },
 
   async update(ctx) {
-    const role = await getUserRole(ctx);
-    if (!['admin', 'content_manager'].includes(role)) {
-      return ctx.forbidden('Only Admin and Content Manager can update blog posts.');
-    }
-    return await super.update(ctx);
+    return ctx.forbidden('Modifying enrollments is not allowed.');
   },
 
   async delete(ctx) {
-    const role = await getUserRole(ctx);
-    if (!['admin', 'content_manager'].includes(role)) {
-      return ctx.forbidden('Only Admin and Content Manager can delete blog posts.');
-    }
-    return await super.delete(ctx);
+    return ctx.forbidden('Deleting enrollments is not allowed.');
   },
+
+  
 
   async find(ctx) {
     const role = await getUserRole(ctx);
+
     if (['admin', 'content_manager'].includes(role)) {
       return await super.find(ctx);
     }
@@ -37,7 +37,9 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       ctx.query = ctx.query || {};
       ctx.query.filters = {
         ...((ctx.query.filters as any) || {}),
-        status: 'PUBLISHED',
+        student: {
+          id: ctx.state.user.id,
+        },
       };
       return await super.find(ctx);
     }
@@ -54,12 +56,17 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     }
 
     if (role === 'student') {
-      const post = await strapi.documents('api::blog-post.blog-post').findOne({
+      const enrollment = await strapi.documents('api::enrollment.enrollment').findOne({
         documentId: id,
+        populate: ['student'],
       });
 
-      if (!post || post.status !== 'PUBLISHED') {
-        return ctx.notFound('Blog post not found or not published.');
+      if (!enrollment) {
+        return ctx.notFound();
+      }
+
+      if (enrollment.student?.id !== ctx.state.user.id) {
+        return ctx.forbidden('You can only view your own enrollments.');
       }
 
       return await super.findOne(ctx);
