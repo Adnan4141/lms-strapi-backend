@@ -1,16 +1,49 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, StrapiContext } from '../../../utils/auth';
+import { getUserRole, isEnrolled, StrapiContext } from '../../../utils/auth';
 
 export default factories.createCoreController('api::quiz-attempt.quiz-attempt', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
+    
     if (role !== 'student') {
+      strapi.log.warn(`[Security] Unauthorized quiz attempt creation by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('Only students can take quizzes.');
     }
 
     const { quiz: quizId, answers } = ctx.request.body.data || {};
     if (!quizId) {
       return ctx.badRequest('Quiz ID is required to submit a quiz attempt.');
+    }
+
+    const quiz = await strapi.documents('api::quiz.quiz').findOne({
+      documentId: quizId,
+      populate: ['course'],
+    });
+
+    if (!quiz || !quiz.course) {
+      return ctx.notFound('Quiz or associated course not found.');
+    }
+
+    const courseId = quiz.course.documentId;
+
+    if (ctx.state.user) {
+      const enrolled = await isEnrolled(courseId, ctx.state.user.id);
+      if (!enrolled) {
+        strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to submit quiz attempt for un-enrolled course ${courseId}.`);
+        return ctx.forbidden('You must be enrolled in the course to take its quiz.');
+      }
+
+  
+      const existingAttempts = await strapi.documents('api::quiz-attempt.quiz-attempt').findMany({
+        filters: {
+          student: { id: ctx.state.user.id },
+          quiz: { documentId: quizId },
+        },
+      });
+
+      if (existingAttempts.length > 0) {
+        return ctx.badRequest('You have already submitted an attempt for this quiz.');
+      }
     }
 
     let calculatedScore = 0;
@@ -38,6 +71,7 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
       ctx.request.body.data = {
         ...ctx.request.body.data,
         student: ctx.state.user.id,
+        course: courseId,
         score: calculatedScore,
         totalQuestions,
         submittedAt: new Date(),
@@ -48,10 +82,12 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
   },
 
   async update(ctx: StrapiContext) {
+    strapi.log.warn(`[Security] Attempt to modify quiz attempt ${ctx.params?.id} by user ${ctx.state.user?.id || 'guest'}`);
     return ctx.forbidden('Quiz attempt submissions cannot be modified.');
   },
 
   async delete(ctx: StrapiContext) {
+    strapi.log.warn(`[Security] Attempt to delete quiz attempt ${ctx.params?.id} by user ${ctx.state.user?.id || 'guest'}`);
     return ctx.forbidden('Quiz attempt records cannot be deleted.');
   },
 
@@ -63,31 +99,36 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
       return super.find(ctx);
     }
 
+    const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
+
     if (role === 'student' && ctx.state.user) {
       ctx.query.filters = {
-        ...(ctx.query.filters || {}),
-        student: {
-          id: ctx.state.user.id,
-        },
+        $and: [
+          ...existingFilters,
+          {
+            student: {
+              id: ctx.state.user.id,
+            },
+          },
+        ],
       };
       return super.find(ctx);
     }
 
     if (role === 'instructor' && ctx.state.user) {
-      const courses = await strapi.documents('api::course.course').findMany({
-        filters: { owner: { id: ctx.state.user.id } },
-      });
-      const courseIds = courses.map((course: any) => course.documentId).filter(Boolean);
-
       ctx.query.filters = {
-        ...(ctx.query.filters || {}),
-        quiz: {
-          course: {
-            documentId: {
-              $in: courseIds,
+        $and: [
+          ...existingFilters,
+          {
+            quiz: {
+              course: {
+                owner: {
+                  id: ctx.state.user.id,
+                },
+              },
             },
           },
-        },
+        ],
       };
       return super.find(ctx);
     }
@@ -103,9 +144,10 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
       return super.findOne(ctx);
     }
 
+   
     const attempt = await strapi.documents('api::quiz-attempt.quiz-attempt').findOne({
       documentId: id,
-      populate: ['student', 'quiz', 'quiz.course'],
+      populate: ['student', 'quiz', 'quiz.course', 'quiz.course.owner'],
     });
 
     if (!attempt) {
@@ -114,23 +156,24 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
 
     if (role === 'student' && ctx.state.user) {
       if (attempt.student?.id !== ctx.state.user.id) {
+        strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to view attempt ${id} of another user.`);
         return ctx.forbidden('You can only view your own quiz attempts.');
       }
-      return super.findOne(ctx);
+      const sanitized = await this.sanitizeOutput(attempt, ctx);
+      return this.transformResponse(sanitized);
     }
 
     if (role === 'instructor' && ctx.state.user) {
       if (!attempt.quiz || !attempt.quiz.course) {
         return ctx.forbidden();
       }
-      const course = await strapi.documents('api::course.course').findOne({
-        documentId: attempt.quiz.course.documentId,
-        populate: ['owner'],
-      });
-      if (course?.owner?.id !== ctx.state.user.id) {
+      const courseOwnerId = (attempt.quiz.course as any)?.owner?.id;
+      if (courseOwnerId !== ctx.state.user.id) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to view attempt ${id} for unowned course.`);
         return ctx.forbidden('You do not own the course this quiz attempt belongs to.');
       }
-      return super.findOne(ctx);
+      const sanitized = await this.sanitizeOutput(attempt, ctx);
+      return this.transformResponse(sanitized);
     }
 
     return ctx.forbidden();

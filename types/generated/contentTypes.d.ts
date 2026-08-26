@@ -495,9 +495,6 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    courseStatus: Schema.Attribute.Enumeration<['DRAFT', 'PUBLISHED']> &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'DRAFT'>;
     coverImage: Schema.Attribute.Media<'images'>;
     coverImageUrl: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;

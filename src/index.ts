@@ -29,7 +29,15 @@ export default {
         rolesMap[r.type] = role;
       }
 
+      const publicRole = await strapi.query('plugin::users-permissions.role').findOne({
+        where: { type: 'public' },
+      });
+
       const roleIds = Object.values(rolesMap).map((r) => r.id);
+      if (publicRole) {
+        roleIds.push(publicRole.id);
+      }
+
       await strapi.db.query('plugin::users-permissions.permission').deleteMany({
         where: {
           role: {
@@ -143,6 +151,8 @@ export default {
         'api::lesson-progress.lesson-progress.findOne',
         'api::quiz-attempt.quiz-attempt.find',
         'api::quiz-attempt.quiz-attempt.findOne',
+        'api::blog-post.blog-post.find',
+        'api::blog-post.blog-post.findOne',
       ];
 
       const studentPermissions = [
@@ -169,6 +179,13 @@ export default {
         'api::blog-post.blog-post.findOne',
       ];
 
+      const publicPermissions = [
+        'api::course.course.find',
+        'api::course.course.findOne',
+        'api::blog-post.blog-post.find',
+        'api::blog-post.blog-post.findOne',
+      ];
+
       const createPerms = (perms: string[], roleId: number) =>
         perms.map((action) =>
           strapi.query('plugin::users-permissions.permission').create({
@@ -176,14 +193,20 @@ export default {
           })
         );
 
-      await Promise.all([
+      const allPermPromises = [
         ...createPerms(adminPermissions, rolesMap['admin'].id),
         ...createPerms(contentManagerPermissions, rolesMap['content_manager'].id),
         ...createPerms(instructorPermissions, rolesMap['instructor'].id),
         ...createPerms(studentPermissions, rolesMap['student'].id),
-      ]);
+      ];
 
-      console.log('All 4 Roles (Admin, Content Manager, Instructor, Student) and Permissions seeded successfully!');
+      if (publicRole) {
+        allPermPromises.push(...createPerms(publicPermissions, publicRole.id));
+      }
+
+      await Promise.all(allPermPromises);
+
+      console.log('All Roles and Public permissions seeded successfully!');
     } catch (err) {
       console.error('Error seeding roles/permissions in bootstrap:', err);
     }

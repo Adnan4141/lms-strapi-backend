@@ -5,6 +5,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized blog creation attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('Only Admin and Content Manager can create blog posts.');
     }
 
@@ -15,38 +16,43 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       };
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized blog update attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('Only Admin and Content Manager can update blog posts.');
     }
-    return await super.update(ctx);
+    return super.update(ctx);
   },
 
   async delete(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized blog deletion attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('Only Admin and Content Manager can delete blog posts.');
     }
-    return await super.delete(ctx);
+    return super.delete(ctx);
   },
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
-    // Anyone (students, instructors, public) canread published blog posts
-    ctx.query = ctx.query || {}; 
+    ctx.query = ctx.query || {};
+    const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
+
     ctx.query.filters = {
-      ...((ctx.query.filters as any) || {}),
-      publishedAt: { $notNull: true },
+      $and: [
+        ...existingFilters,
+        { publishedAt: { $notNull: true } },
+      ],
     };
-    return await super.find(ctx);
+    return super.find(ctx);
   },
 
   async findOne(ctx: StrapiContext) {
@@ -54,18 +60,19 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
-    // Anyone can read a single published blog post
     const post = await strapi.documents('api::blog-post.blog-post').findOne({
       documentId: id,
+      populate: ['author', 'coverImage'],
     });
 
     if (!post || !post.publishedAt) {
       return ctx.notFound('Blog post not found or not published.');
     }
 
-    return await super.findOne(ctx);
+    const sanitized = await this.sanitizeOutput(post, ctx);
+    return this.transformResponse(sanitized);
   },
 }));

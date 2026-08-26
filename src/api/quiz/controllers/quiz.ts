@@ -5,6 +5,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized quiz creation attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to create quizzes.');
     }
 
@@ -15,6 +16,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
       }
       const isOwner = await isCourseOwner(courseId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to add quiz to unowned course ${courseId}.`);
         return ctx.forbidden('Instructors can only create quizzes for their own courses.');
       }
     }
@@ -26,6 +28,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized quiz update attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to update quizzes.');
     }
 
@@ -41,6 +44,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
 
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to update quiz ${id} in unowned course.`);
         return ctx.forbidden('Instructors can only update quizzes for their own courses.');
       }
     }
@@ -52,6 +56,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized quiz deletion attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to delete quizzes.');
     }
 
@@ -67,6 +72,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
 
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to delete quiz ${id} in unowned course.`);
         return ctx.forbidden('Instructors can only delete quizzes for their own courses.');
       }
     }
@@ -76,28 +82,42 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
-    if (['admin', 'content_manager', 'instructor'].includes(role)) {
+    if (['admin', 'content_manager'].includes(role)) {
+      return super.find(ctx);
+    }
+
+    ctx.query = ctx.query || {};
+    const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
+
+    if (role === 'instructor' && ctx.state.user) {
+      ctx.query.filters = {
+        $and: [
+          ...existingFilters,
+          {
+            $or: [
+              { course: { publishedAt: { $notNull: true } } },
+              { course: { owner: { id: ctx.state.user.id } } },
+            ],
+          },
+        ],
+      };
       return super.find(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
-      const enrollments = await strapi.documents('api::enrollment.enrollment').findMany({
-        filters: { student: { id: ctx.state.user.id } },
-        populate: ['course'],
-      });
-
-      const enrolledCourseIds = enrollments.map((item: any) => item.course?.documentId).filter(Boolean);
-
-      ctx.query = ctx.query || {};
       ctx.query.filters = {
-        ...(ctx.query.filters || {}),
-        course: {
-          documentId: {
-            $in: enrolledCourseIds,
+        $and: [
+          ...existingFilters,
+          {
+            course: {
+              publishedAt: { $notNull: true },
+              enrollments: {
+                student: { id: ctx.state.user.id },
+              },
+            },
           },
-        },
+        ],
       };
-
       return super.find(ctx);
     }
 
@@ -108,26 +128,43 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
 
-    if (['admin', 'content_manager', 'instructor'].includes(role)) {
+    if (['admin', 'content_manager'].includes(role)) {
       return super.findOne(ctx);
     }
 
-    if (role === 'student' && ctx.state.user) {
-      const quiz = await strapi.documents('api::quiz.quiz').findOne({
-        documentId: id,
-        populate: ['course'],
-      });
+    const quiz = await strapi.documents('api::quiz.quiz').findOne({
+      documentId: id,
+      populate: ['course', 'course.owner', 'questions'],
+    });
 
-      if (!quiz || !quiz.course) {
-        return ctx.notFound();
+    if (!quiz || !quiz.course) {
+      return ctx.notFound('Quiz not found.');
+    }
+
+    const isCoursePublished = Boolean(quiz.course.publishedAt);
+
+    if (role === 'instructor' && ctx.state.user) {
+      const isCourseOwnerUser = (quiz.course.owner as any)?.id === ctx.state.user.id;
+      if (!isCoursePublished && !isCourseOwnerUser) {
+        return ctx.notFound('Quiz not found or not published.');
+      }
+      const sanitized = await this.sanitizeOutput(quiz, ctx);
+      return this.transformResponse(sanitized);
+    }
+
+    if (role === 'student' && ctx.state.user) {
+      if (!isCoursePublished) {
+        return ctx.notFound('Quiz not found or not published.');
       }
 
       const enrolled = await isEnrolled(quiz.course.documentId, ctx.state.user.id);
       if (!enrolled) {
+        strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to view quiz ${id} without course enrollment.`);
         return ctx.forbidden('You must be enrolled in this course to view its quiz.');
       }
 
-      return super.findOne(ctx);
+      const sanitized = await this.sanitizeOutput(quiz, ctx);
+      return this.transformResponse(sanitized);
     }
 
     return ctx.forbidden();

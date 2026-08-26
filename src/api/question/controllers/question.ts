@@ -1,32 +1,11 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isCourseOwner, StrapiContext } from '../../../utils/auth';
-
-function stripCorrectAnswer(value: any): any {
-  if (Array.isArray(value)) {
-    return value.map(stripCorrectAnswer);
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  const cleaned: Record<string, any> = {};
-
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (key === 'correctAnswer') {
-      continue;
-    }
-
-    cleaned[key] = stripCorrectAnswer(nestedValue);
-  }
-
-  return cleaned;
-}
+import { getUserRole, isCourseOwner, isEnrolled, StrapiContext } from '../../../utils/auth';
 
 export default factories.createCoreController('api::question.question', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized question creation attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to create questions.');
     }
 
@@ -47,6 +26,7 @@ export default factories.createCoreController('api::question.question', ({ strap
 
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to add question to unowned course quiz ${quizId}.`);
         return ctx.forbidden('Instructors can only add questions to quizzes in their own courses.');
       }
     }
@@ -58,6 +38,7 @@ export default factories.createCoreController('api::question.question', ({ strap
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized question update attempt on ${id} by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to update questions.');
     }
 
@@ -73,6 +54,7 @@ export default factories.createCoreController('api::question.question', ({ strap
 
       const isOwner = await isCourseOwner(question.quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to edit question ${id} in unowned course.`);
         return ctx.forbidden('Instructors can only edit questions in their own courses.');
       }
     }
@@ -84,6 +66,7 @@ export default factories.createCoreController('api::question.question', ({ strap
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      strapi.log.warn(`[Security] Unauthorized question deletion attempt on ${id} by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
       return ctx.forbidden('You do not have permission to delete questions.');
     }
 
@@ -99,6 +82,7 @@ export default factories.createCoreController('api::question.question', ({ strap
 
       const isOwner = await isCourseOwner(question.quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
+        strapi.log.warn(`[Security] Instructor ${ctx.state.user.id} attempted to delete question ${id} from unowned course.`);
         return ctx.forbidden('Instructors can only delete questions from their own courses.');
       }
     }
@@ -108,23 +92,93 @@ export default factories.createCoreController('api::question.question', ({ strap
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
-    const response = await super.find(ctx);
-
-    if (role === 'student' && response?.data) {
-      response.data = stripCorrectAnswer(response.data);
+    if (['admin', 'content_manager'].includes(role)) {
+      return super.find(ctx);
     }
 
-    return response;
+    ctx.query = ctx.query || {};
+    const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
+
+    if (role === 'instructor' && ctx.state.user) {
+      ctx.query.filters = {
+        $and: [
+          ...existingFilters,
+          {
+            $or: [
+              { quiz: { course: { publishedAt: { $notNull: true } } } },
+              { quiz: { course: { owner: { id: ctx.state.user.id } } } },
+            ],
+          },
+        ],
+      };
+      return super.find(ctx);
+    }
+
+    if (role === 'student' && ctx.state.user) {
+      ctx.query.filters = {
+        $and: [
+          ...existingFilters,
+          {
+            quiz: {
+              course: {
+                publishedAt: { $notNull: true },
+                enrollments: {
+                  student: { id: ctx.state.user.id },
+                },
+              },
+            },
+          },
+        ],
+      };
+      return super.find(ctx);
+    }
+
+    return ctx.forbidden();
   },
 
   async findOne(ctx: StrapiContext) {
+    const { id } = ctx.params;
     const role = await getUserRole(ctx);
-    const response = await super.findOne(ctx);
 
-    if (role === 'student' && response?.data) {
-      response.data = stripCorrectAnswer(response.data);
+    if (['admin', 'content_manager'].includes(role)) {
+      return super.findOne(ctx);
     }
 
-    return response;
+    const question = await strapi.documents('api::question.question').findOne({
+      documentId: id,
+      populate: ['quiz', 'quiz.course', 'quiz.course.owner'],
+    });
+
+    if (!question || !question.quiz || !question.quiz.course) {
+      return ctx.notFound('Question not found.');
+    }
+
+    const isCoursePublished = Boolean(question.quiz.course.publishedAt);
+
+    if (role === 'instructor' && ctx.state.user) {
+      const isOwner = (question.quiz.course.owner as any)?.id === ctx.state.user.id;
+      if (!isCoursePublished && !isOwner) {
+        return ctx.notFound('Question not found or not published.');
+      }
+      const sanitized = await this.sanitizeOutput(question, ctx);
+      return this.transformResponse(sanitized);
+    }
+
+    if (role === 'student' && ctx.state.user) {
+      if (!isCoursePublished) {
+        return ctx.notFound('Question not found or not published.');
+      }
+
+      const enrolled = await isEnrolled(question.quiz.course.documentId, ctx.state.user.id);
+      if (!enrolled) {
+        strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to view question ${id} without course enrollment.`);
+        return ctx.forbidden('You must be enrolled in this course to view its questions.');
+      }
+
+      const sanitized = await this.sanitizeOutput(question, ctx);
+      return this.transformResponse(sanitized);
+    }
+
+    return ctx.forbidden();
   },
 }));

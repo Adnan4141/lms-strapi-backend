@@ -23,7 +23,8 @@
     "correctAnswer": {
       "type": "integer",
       "required": true,
-      "min": 0
+      "min": 0,
+      "private": true
     },
     "order": {
       "type": "integer",
