@@ -5,7 +5,7 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (role !== 'student') {
-      return ctx.forbidden('Only students are allowed to enroll in courses.');
+      return ctx.forbidden('Only enrolled students can perform this action.');
     }
 
     if (ctx.state.user) {
@@ -16,33 +16,33 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       };
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
-    return ctx.forbidden('Modifying enrollments is not allowed.');
+    return ctx.forbidden('Enrollment records cannot be modified directly.');
   },
 
   async delete(ctx: StrapiContext) {
-    return ctx.forbidden('Deleting enrollments is not allowed.');
+    return ctx.forbidden('Enrollment records cannot be deleted directly.');
   },
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
       ctx.query = ctx.query || {};
       ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
+        ...(ctx.query.filters || {}),
         student: {
           id: ctx.state.user.id,
         },
       };
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     return ctx.forbidden();
@@ -53,7 +53,7 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
@@ -63,14 +63,14 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       });
 
       if (!enrollment) {
-        return ctx.notFound();
+        return ctx.notFound('Enrollment record not found.');
       }
 
       if (enrollment.student?.id !== ctx.state.user.id) {
-        return ctx.forbidden('You can only view your own enrollments.');
+        return ctx.forbidden('You can only view your own course enrollments.');
       }
-      
-      return await super.findOne(ctx);
+
+      return super.findOne(ctx);
     }
 
     return ctx.forbidden();

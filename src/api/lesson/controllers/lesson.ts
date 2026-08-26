@@ -5,7 +5,7 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to create lessons.');
+      return ctx.forbidden('You do not have permission to create lessons.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -19,14 +19,14 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
       }
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to update lessons.');
+      return ctx.forbidden('You do not have permission to update lessons.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -34,23 +34,25 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
         documentId: id,
         populate: ['course'],
       });
+
       if (!lesson || !lesson.course) {
         return ctx.notFound('Lesson or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(lesson.course.documentId, ctx.state.user.id);
       if (!isOwner) {
-        return ctx.forbidden('Instructors can only update lessons of their own courses.');
+        return ctx.forbidden('Instructors can only edit lessons in their own courses.');
       }
     }
 
-    return await super.update(ctx);
+    return super.update(ctx);
   },
 
   async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to delete lessons.');
+      return ctx.forbidden('You do not have permission to delete lessons.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -58,22 +60,24 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
         documentId: id,
         populate: ['course'],
       });
+
       if (!lesson || !lesson.course) {
         return ctx.notFound('Lesson or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(lesson.course.documentId, ctx.state.user.id);
       if (!isOwner) {
-        return ctx.forbidden('Instructors can only delete lessons of their own courses.');
+        return ctx.forbidden('Instructors can only delete lessons from their own courses.');
       }
     }
 
-    return await super.delete(ctx);
+    return super.delete(ctx);
   },
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (['admin', 'content_manager', 'instructor'].includes(role)) {
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
@@ -82,11 +86,11 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
         populate: ['course'],
       });
 
-      const enrolledCourseIds = enrollments.map((e: any) => e.course?.documentId).filter(Boolean);
+      const enrolledCourseIds = enrollments.map((item: any) => item.course?.documentId).filter(Boolean);
 
       ctx.query = ctx.query || {};
       ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
+        ...(ctx.query.filters || {}),
         course: {
           documentId: {
             $in: enrolledCourseIds,
@@ -94,7 +98,7 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
         },
       };
 
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     return ctx.forbidden();
@@ -105,7 +109,7 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager', 'instructor'].includes(role)) {
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
@@ -115,15 +119,15 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
       });
 
       if (!lesson || !lesson.course) {
-        return ctx.notFound();
+        return ctx.notFound('Lesson not found.');
       }
 
       const enrolled = await isEnrolled(lesson.course.documentId, ctx.state.user.id);
       if (!enrolled) {
-        return ctx.forbidden('You are not enrolled in the course this lesson belongs to.');
+        return ctx.forbidden('You must be enrolled in this course to view its lessons.');
       }
 
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     return ctx.forbidden();

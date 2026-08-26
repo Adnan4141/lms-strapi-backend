@@ -5,7 +5,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (role !== 'student') {
-      return ctx.forbidden('Only students can create progress records.');
+      return ctx.forbidden('Only students can track lesson progress.');
     }
 
     if (ctx.state.user) {
@@ -15,14 +15,14 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       };
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (role !== 'student') {
-      return ctx.forbidden('Only students can update progress records.');
+      return ctx.forbidden('Only students can update lesson progress.');
     }
 
     const progress = await strapi.documents('api::lesson-progress.lesson-progress').findOne({
@@ -42,11 +42,11 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       ctx.request.body.data.student = ctx.state.user.id;
     }
 
-    return await super.update(ctx);
+    return super.update(ctx);
   },
 
   async delete(ctx: StrapiContext) {
-    return ctx.forbidden('Deleting progress records is not allowed.');
+    return ctx.forbidden('Progress records cannot be deleted.');
   },
 
   async find(ctx: StrapiContext) {
@@ -54,27 +54,27 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
 
     ctx.query = ctx.query || {};
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
       ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
+        ...(ctx.query.filters || {}),
         student: {
           id: ctx.state.user.id,
         },
       };
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     if (role === 'instructor' && ctx.state.user) {
       const courses = await strapi.documents('api::course.course').findMany({
         filters: { owner: { id: ctx.state.user.id } },
       });
-      const courseIds = courses.map((c: any) => c.documentId).filter(Boolean);
+      const courseIds = courses.map((course: any) => course.documentId).filter(Boolean);
 
       ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
+        ...(ctx.query.filters || {}),
         lesson: {
           course: {
             documentId: {
@@ -83,7 +83,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
           },
         },
       };
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     return ctx.forbidden();
@@ -94,7 +94,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager'].includes(role)) {
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     const progress = await strapi.documents('api::lesson-progress.lesson-progress').findOne({
@@ -103,14 +103,14 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     });
 
     if (!progress) {
-      return ctx.notFound();
+      return ctx.notFound('Progress record not found.');
     }
 
     if (role === 'student' && ctx.state.user) {
       if (progress.student?.id !== ctx.state.user.id) {
         return ctx.forbidden('You can only view your own progress records.');
       }
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -124,7 +124,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       if (course?.owner?.id !== ctx.state.user.id) {
         return ctx.forbidden('You do not own the course this progress record belongs to.');
       }
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     return ctx.forbidden();
@@ -134,8 +134,8 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     const { courseId } = ctx.params;
     const role = await getUserRole(ctx);
 
-    if (role !== 'student' && !['admin', 'content_manager'].includes(role)) {
-      return ctx.forbidden('Unauthorized access to course progress.');
+    if (role !== 'student' && !['admin', 'content_manager', 'instructor'].includes(role)) {
+      return ctx.forbidden('Access denied to course progress details.');
     }
 
     const lessons = await strapi.documents('api::lesson.lesson').findMany({
@@ -152,15 +152,17 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       };
     }
 
-    const lessonIds = lessons.map((l: any) => l.documentId);
+    const lessonIds = lessons.map((lesson: any) => lesson.documentId);
 
-    const completedProgress = ctx.state.user ? await strapi.documents('api::lesson-progress.lesson-progress').findMany({
-      filters: {
-        student: { id: ctx.state.user.id },
-        isCompleted: true,
-        lesson: { documentId: { $in: lessonIds } },
-      },
-    }) : [];
+    const completedProgress = ctx.state.user
+      ? await strapi.documents('api::lesson-progress.lesson-progress').findMany({
+          filters: {
+            student: { id: ctx.state.user.id },
+            isCompleted: true,
+            lesson: { documentId: { $in: lessonIds } },
+          },
+        })
+      : [];
 
     const completedLessons = completedProgress.length;
     const percentage = Math.round((completedLessons / totalLessons) * 100);

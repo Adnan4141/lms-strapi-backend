@@ -23,7 +23,15 @@ export async function isCourseOwner(courseId: string | number, userId: string | 
     populate: ['owner'],
   });
 
-  return course?.owner?.id === userId;
+  const owner = course?.owner as { id?: string | number; documentId?: string } | undefined;
+
+  if (!owner) {
+    return false;
+  }
+
+  const ownerIdentifiers = [owner.id, owner.documentId].filter(Boolean).map(String);
+
+  return ownerIdentifiers.includes(String(userId));
 }
 
 export async function isEnrolled(courseId: string | number, userId: string | number): Promise<boolean> {

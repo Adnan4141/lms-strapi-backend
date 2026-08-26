@@ -38,7 +38,7 @@ export interface Course {
   description: string;
   coverImageUrl?: string;
   coverImage?: any;
-  courseStatus: 'DRAFT' | 'PUBLISHED';
+  courseStatus?: 'DRAFT' | 'PUBLISHED';
   owner: AuthUser;
   lessons?: Lesson[];
   quizzes?: Quiz[];

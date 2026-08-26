@@ -7,6 +7,14 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     if (!['admin', 'content_manager'].includes(role)) {
       return ctx.forbidden('Only Admin and Content Manager can create blog posts.');
     }
+
+    if (ctx.state.user && ctx.request.body?.data) {
+      ctx.request.body.data = {
+        ...ctx.request.body.data,
+        author: ctx.request.body.data.author || ctx.state.user.id,
+      };
+    }
+
     return await super.create(ctx);
   },
 
@@ -32,8 +40,8 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       return await super.find(ctx);
     }
 
-    // Anyone (students, instructors, public) can read published blog posts
-    ctx.query = ctx.query || {};
+    // Anyone (students, instructors, public) canread published blog posts
+    ctx.query = ctx.query || {}; 
     ctx.query.filters = {
       ...((ctx.query.filters as any) || {}),
       publishedAt: { $notNull: true },

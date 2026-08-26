@@ -31,15 +31,6 @@
         "images"
       ]
     },
-    "courseStatus": {
-      "type": "enumeration",
-      "default": "DRAFT",
-      "enum": [
-        "DRAFT",
-        "PUBLISHED"
-      ],
-      "required": true
-    },
     "lessons": {
       "type": "relation",
       "relation": "oneToMany",

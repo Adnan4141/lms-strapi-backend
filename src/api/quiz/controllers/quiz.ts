@@ -5,7 +5,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to create quizzes.');
+      return ctx.forbidden('You do not have permission to create quizzes.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -19,14 +19,14 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
       }
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to update quizzes.');
+      return ctx.forbidden('You do not have permission to update quizzes.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -34,23 +34,25 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
         documentId: id,
         populate: ['course'],
       });
+
       if (!quiz || !quiz.course) {
         return ctx.notFound('Quiz or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
         return ctx.forbidden('Instructors can only update quizzes for their own courses.');
       }
     }
 
-    return await super.update(ctx);
+    return super.update(ctx);
   },
 
   async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to delete quizzes.');
+      return ctx.forbidden('You do not have permission to delete quizzes.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -58,22 +60,24 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
         documentId: id,
         populate: ['course'],
       });
+
       if (!quiz || !quiz.course) {
         return ctx.notFound('Quiz or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
         return ctx.forbidden('Instructors can only delete quizzes for their own courses.');
       }
     }
 
-    return await super.delete(ctx);
+    return super.delete(ctx);
   },
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (['admin', 'content_manager', 'instructor'].includes(role)) {
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
@@ -82,11 +86,11 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
         populate: ['course'],
       });
 
-      const enrolledCourseIds = enrollments.map((e: any) => e.course?.documentId).filter(Boolean);
+      const enrolledCourseIds = enrollments.map((item: any) => item.course?.documentId).filter(Boolean);
 
       ctx.query = ctx.query || {};
       ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
+        ...(ctx.query.filters || {}),
         course: {
           documentId: {
             $in: enrolledCourseIds,
@@ -94,7 +98,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
         },
       };
 
-      return await super.find(ctx);
+      return super.find(ctx);
     }
 
     return ctx.forbidden();
@@ -105,7 +109,7 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
     const role = await getUserRole(ctx);
 
     if (['admin', 'content_manager', 'instructor'].includes(role)) {
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     if (role === 'student' && ctx.state.user) {
@@ -120,28 +124,12 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
 
       const enrolled = await isEnrolled(quiz.course.documentId, ctx.state.user.id);
       if (!enrolled) {
-        return ctx.forbidden('You are not enrolled in the course this quiz belongs to.');
+        return ctx.forbidden('You must be enrolled in this course to view its quiz.');
       }
 
-      return await super.findOne(ctx);
+      return super.findOne(ctx);
     }
 
     return ctx.forbidden();
   },
-
-
-
-async test(ctx: StrapiContext) {
-    const { id } = ctx.params;
-    const role = await getUserRole(ctx);
-
-
-    return { message: `Test endpoint accessed by user with role: ${role} for quiz ID: ${id}` };
-}
-
-
-
-
-
-
 }));

@@ -1,11 +1,33 @@
 import { factories } from '@strapi/strapi';
 import { getUserRole, isCourseOwner, StrapiContext } from '../../../utils/auth';
 
+function stripCorrectAnswer(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(stripCorrectAnswer);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const cleaned: Record<string, any> = {};
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === 'correctAnswer') {
+      continue;
+    }
+
+    cleaned[key] = stripCorrectAnswer(nestedValue);
+  }
+
+  return cleaned;
+}
+
 export default factories.createCoreController('api::question.question', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to create questions.');
+      return ctx.forbidden('You do not have permission to create questions.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -13,27 +35,30 @@ export default factories.createCoreController('api::question.question', ({ strap
       if (!quizId) {
         return ctx.badRequest('Quiz ID is required to create a question.');
       }
+
       const quiz = await strapi.documents('api::quiz.quiz').findOne({
         documentId: quizId,
         populate: ['course'],
       });
+
       if (!quiz || !quiz.course) {
         return ctx.notFound('Quiz or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
         return ctx.forbidden('Instructors can only add questions to quizzes in their own courses.');
       }
     }
 
-    return await super.create(ctx);
+    return super.create(ctx);
   },
 
   async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to update questions.');
+      return ctx.forbidden('You do not have permission to update questions.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -41,23 +66,25 @@ export default factories.createCoreController('api::question.question', ({ strap
         documentId: id,
         populate: ['quiz', 'quiz.course'],
       });
+
       if (!question || !question.quiz || !question.quiz.course) {
         return ctx.notFound('Question or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(question.quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
-        return ctx.forbidden('Instructors can only update questions in their own courses.');
+        return ctx.forbidden('Instructors can only edit questions in their own courses.');
       }
     }
 
-    return await super.update(ctx);
+    return super.update(ctx);
   },
 
   async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
-      return ctx.forbidden('You are not allowed to delete questions.');
+      return ctx.forbidden('You do not have permission to delete questions.');
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -65,34 +92,26 @@ export default factories.createCoreController('api::question.question', ({ strap
         documentId: id,
         populate: ['quiz', 'quiz.course'],
       });
+
       if (!question || !question.quiz || !question.quiz.course) {
         return ctx.notFound('Question or associated course not found.');
       }
+
       const isOwner = await isCourseOwner(question.quiz.course.documentId, ctx.state.user.id);
       if (!isOwner) {
-        return ctx.forbidden('Instructors can only delete questions in their own courses.');
+        return ctx.forbidden('Instructors can only delete questions from their own courses.');
       }
     }
 
-    return await super.delete(ctx);
+    return super.delete(ctx);
   },
 
   async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     const response = await super.find(ctx);
 
-    if (role === 'student') {
-      if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          response.data = response.data.map((item: any) => {
-            if (item.correctAnswer !== undefined) delete item.correctAnswer;
-            if (item.attributes && item.attributes.correctAnswer !== undefined) {
-              delete item.attributes.correctAnswer;
-            }
-            return item;
-          });
-        }
-      }
+    if (role === 'student' && response?.data) {
+      response.data = stripCorrectAnswer(response.data);
     }
 
     return response;
@@ -102,14 +121,8 @@ export default factories.createCoreController('api::question.question', ({ strap
     const role = await getUserRole(ctx);
     const response = await super.findOne(ctx);
 
-    if (role === 'student') {
-      if (response && response.data) {
-        const item = response.data;
-        if (item.correctAnswer !== undefined) delete item.correctAnswer;
-        if (item.attributes && item.attributes.correctAnswer !== undefined) {
-          delete item.attributes.correctAnswer;
-        }
-      }
+    if (role === 'student' && response?.data) {
+      response.data = stripCorrectAnswer(response.data);
     }
 
     return response;
