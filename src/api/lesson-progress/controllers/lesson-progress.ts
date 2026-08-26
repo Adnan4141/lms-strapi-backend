@@ -1,7 +1,7 @@
 import { factories } from '@strapi/strapi';
 import { getUserRole } from '../../../utils/auth';
 
-export default factories.createCoreController('api::progress.progress', ({ strapi }) => ({
+export default factories.createCoreController('api::lesson-progress.lesson-progress', ({ strapi }) => ({
   async create(ctx) {
     const role = await getUserRole(ctx);
     if (role !== 'student') {
@@ -23,7 +23,7 @@ export default factories.createCoreController('api::progress.progress', ({ strap
       return ctx.forbidden('Only students can update progress records.');
     }
 
-    const progress = await strapi.documents('api::progress.progress').findOne({
+    const progress = await strapi.documents('api::lesson-progress.lesson-progress').findOne({
       documentId: id,
       populate: ['student'],
     });
@@ -95,7 +95,7 @@ export default factories.createCoreController('api::progress.progress', ({ strap
       return await super.findOne(ctx);
     }
 
-    const progress = await strapi.documents('api::progress.progress').findOne({
+    const progress = await strapi.documents('api::lesson-progress.lesson-progress').findOne({
       documentId: id,
       populate: ['student', 'lesson', 'lesson.course'],
     });
@@ -152,7 +152,7 @@ export default factories.createCoreController('api::progress.progress', ({ strap
 
     const lessonIds = lessons.map((l: any) => l.documentId);
 
-    const completedProgress = await strapi.documents('api::progress.progress').findMany({
+    const completedProgress = await strapi.documents('api::lesson-progress.lesson-progress').findMany({
       filters: {
         student: { id: ctx.state.user.id },
         isCompleted: true,

@@ -2,8 +2,8 @@ export default {
   routes: [
     {
       method: 'GET',
-      path: '/progresses/course/:courseId',
-      handler: 'progress.getCourseProgress',
+      path: '/lesson-progresses/course/:courseId',
+      handler: 'lesson-progress.getCourseProgress',
       config: {
         policies: [],
         middlewares: [],

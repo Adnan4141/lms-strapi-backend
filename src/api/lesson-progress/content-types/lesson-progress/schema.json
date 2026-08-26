@@ -1,11 +1,11 @@
 {
   "kind": "collectionType",
-  "collectionName": "progresses",
+  "collectionName": "lesson_progresses",
   "info": {
-    "singularName": "progress",
-    "pluralName": "progresses",
-    "displayName": "Progress",
-    "description": "Progress Content Type"
+    "singularName": "lesson-progress",
+    "pluralName": "lesson-progresses",
+    "displayName": "LessonProgress",
+    "description": "Lesson Progress Content Type"
   },
   "options": {
     "draftAndPublish": true

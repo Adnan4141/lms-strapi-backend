@@ -551,6 +551,41 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiLessonProgressLessonProgress
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'lesson_progresses';
+  info: {
+    description: 'Lesson Progress Content Type';
+    displayName: 'LessonProgress';
+    pluralName: 'lesson-progresses';
+    singularName: 'lesson-progress';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    isCompleted: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    lesson: Schema.Attribute.Relation<'manyToOne', 'api::lesson.lesson'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::lesson-progress.lesson-progress'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    student: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiLessonLesson extends Struct.CollectionTypeSchema {
   collectionName: 'lessons';
   info: {
@@ -580,40 +615,6 @@ export interface ApiLessonLesson extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     videoUrl: Schema.Attribute.String;
-  };
-}
-
-export interface ApiProgressProgress extends Struct.CollectionTypeSchema {
-  collectionName: 'progresses';
-  info: {
-    description: 'Progress Content Type';
-    displayName: 'Progress';
-    pluralName: 'progresses';
-    singularName: 'progress';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    isCompleted: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
-    lesson: Schema.Attribute.Relation<'manyToOne', 'api::lesson.lesson'>;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::progress.progress'
-    > &
-      Schema.Attribute.Private;
-    publishedAt: Schema.Attribute.DateTime;
-    student: Schema.Attribute.Relation<
-      'manyToOne',
-      'plugin::users-permissions.user'
-    >;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
   };
 }
 
@@ -1226,8 +1227,8 @@ declare module '@strapi/strapi' {
       'api::blog-post.blog-post': ApiBlogPostBlogPost;
       'api::course.course': ApiCourseCourse;
       'api::enrollment.enrollment': ApiEnrollmentEnrollment;
+      'api::lesson-progress.lesson-progress': ApiLessonProgressLessonProgress;
       'api::lesson.lesson': ApiLessonLesson;
-      'api::progress.progress': ApiProgressProgress;
       'api::question.question': ApiQuestionQuestion;
       'api::quiz-attempt.quiz-attempt': ApiQuizAttemptQuizAttempt;
       'api::quiz.quiz': ApiQuizQuiz;
