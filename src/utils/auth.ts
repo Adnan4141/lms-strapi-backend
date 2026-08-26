@@ -1,4 +1,3 @@
-import { Core } from '@strapi/strapi';
 import { StrapiContext } from '../types';
 
 export * from '../types';
@@ -8,7 +7,12 @@ export async function getUserRole(ctx: StrapiContext | any): Promise<string> {
     return 'public';
   }
 
-  // Populate the role to get its type
+
+  if (ctx.state.user.role?.type) {
+    return ctx.state.user.role.type;
+  }
+
+  // Fallback-----------------
   const user = await strapi.documents('plugin::users-permissions.user').findOne({
     documentId: ctx.state.user.documentId,
     populate: ['role'],
@@ -18,11 +22,23 @@ export async function getUserRole(ctx: StrapiContext | any): Promise<string> {
 }
 
 export async function isCourseOwner(courseId: string | number, userId: string | number): Promise<boolean> {
-  const course = await strapi.documents('api::course.course').findOne({
-    documentId: String(courseId),
+  if (!courseId || !userId) {
+    return false;
+  }
+
+  const numCourseId = Number(courseId);
+
+  const courses = await strapi.documents('api::course.course').findMany({
+    filters: {
+      $or: [
+        { documentId: String(courseId) },
+        ...(numCourseId ? [{ id: numCourseId }] : []),
+      ],
+    },
     populate: ['owner'],
   });
 
+  const course = courses[0];
   const owner = course?.owner as { id?: string | number; documentId?: string } | undefined;
 
   if (!owner) {
@@ -30,18 +46,31 @@ export async function isCourseOwner(courseId: string | number, userId: string | 
   }
 
   const ownerIdentifiers = [owner.id, owner.documentId].filter(Boolean).map(String);
-
   return ownerIdentifiers.includes(String(userId));
 }
 
 export async function isEnrolled(courseId: string | number, userId: string | number): Promise<boolean> {
+  if (!courseId || !userId) {
+    return false;
+  }
+
+  const numCourseId = Number(courseId);
+  const numUserId = Number(userId);
+
   const enrollments = await strapi.documents('api::enrollment.enrollment').findMany({
     filters: {
       course: {
-        documentId: String(courseId),
+        $or: [
+          { documentId: String(courseId) },
+          ...(numCourseId ? [{ id: numCourseId }] : []),
+        ],
       },
       student: {
-        id: userId,
+        $or: [
+          { id: userId },
+          { documentId: String(userId) },
+          ...(numUserId ? [{ id: numUserId }] : []),
+        ],
       },
     },
   });

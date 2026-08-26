@@ -662,6 +662,7 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
   attributes: {
     correctAnswer: Schema.Attribute.Integer &
       Schema.Attribute.Required &
+      Schema.Attribute.Private &
       Schema.Attribute.SetMinMax<
         {
           min: 0;

@@ -5,7 +5,7 @@ const customRoutes: CustomRoutes = {
     {
       method: 'GET',
       path: '/admin-dashboard/stats',
-      handler: 'course.getStats',
+      handler: 'api::course.course.getStats',
       config: {
         policies: [],
         middlewares: [],
