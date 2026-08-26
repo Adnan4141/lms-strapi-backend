@@ -12,10 +12,24 @@
   "pluginOptions": {},
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true,
+      "minLength": 3
     },
     "description": {
-      "type": "richtext"
+      "type": "richtext",
+      "required": true
+    },
+    "coverImageUrl": {
+      "type": "string"
+    },
+    "coverImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
     },
     "courseStatus": {
       "type": "enumeration",
@@ -23,7 +37,8 @@
       "enum": [
         "DRAFT",
         "PUBLISHED"
-      ]
+      ],
+      "required": true
     },
     "lessons": {
       "type": "relation",
@@ -37,10 +52,17 @@
       "target": "api::quiz.quiz",
       "mappedBy": "course"
     },
+    "enrollments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::enrollment.enrollment",
+      "mappedBy": "course"
+    },
     "owner": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "plugin::users-permissions.user"
+      "target": "plugin::users-permissions.user",
+      "required": true
     }
   }
 }

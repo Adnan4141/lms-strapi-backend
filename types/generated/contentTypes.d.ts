@@ -452,16 +452,16 @@ export interface ApiBlogPostBlogPost extends Struct.CollectionTypeSchema {
     singularName: 'blog-post';
   };
   options: {
-    draftAndPublish: false;
+    draftAndPublish: true;
   };
   attributes: {
     author: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
-    >;
-    body: Schema.Attribute.RichText;
+    > &
+      Schema.Attribute.Required;
+    body: Schema.Attribute.RichText & Schema.Attribute.Required;
     coverImage: Schema.Attribute.Media<'images'>;
-    coverImageUrl: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -472,9 +472,15 @@ export interface ApiBlogPostBlogPost extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'title'>;
     status: Schema.Attribute.Enumeration<['DRAFT', 'PUBLISHED']> &
+      Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'DRAFT'>;
-    title: Schema.Attribute.String;
+    title: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -493,11 +499,17 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
   };
   attributes: {
     courseStatus: Schema.Attribute.Enumeration<['DRAFT', 'PUBLISHED']> &
+      Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'DRAFT'>;
+    coverImageUrl: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.RichText;
+    description: Schema.Attribute.RichText & Schema.Attribute.Required;
+    enrollments: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::enrollment.enrollment'
+    >;
     lessons: Schema.Attribute.Relation<'oneToMany', 'api::lesson.lesson'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -508,10 +520,15 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     owner: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
-    >;
+    > &
+      Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     quizzes: Schema.Attribute.Relation<'oneToMany', 'api::quiz.quiz'>;
-    title: Schema.Attribute.String;
+    title: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -530,10 +547,12 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'> &
+      Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    enrolledAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -544,7 +563,8 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
     student: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
-    >;
+    > &
+      Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -564,11 +584,14 @@ export interface ApiLessonProgressLessonProgress
     draftAndPublish: true;
   };
   attributes: {
+    completedAt: Schema.Attribute.DateTime;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     isCompleted: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
-    lesson: Schema.Attribute.Relation<'manyToOne', 'api::lesson.lesson'>;
+    lesson: Schema.Attribute.Relation<'manyToOne', 'api::lesson.lesson'> &
+      Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -579,7 +602,8 @@ export interface ApiLessonProgressLessonProgress
     student: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
-    >;
+    > &
+      Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -597,8 +621,9 @@ export interface ApiLessonLesson extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    content: Schema.Attribute.RichText & Schema.Attribute.DefaultTo<'DRAFT'>;
-    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
+    content: Schema.Attribute.RichText & Schema.Attribute.Required;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'> &
+      Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -608,9 +633,20 @@ export interface ApiLessonLesson extends Struct.CollectionTypeSchema {
       'api::lesson.lesson'
     > &
       Schema.Attribute.Private;
-    order: Schema.Attribute.Integer;
+    order: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
-    title: Schema.Attribute.String;
+    title: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -629,7 +665,14 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    correctAnswer: Schema.Attribute.Integer;
+    correctAnswer: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -639,11 +682,23 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
       'api::question.question'
     > &
       Schema.Attribute.Private;
-    options: Schema.Attribute.JSON;
-    order: Schema.Attribute.Integer;
+    options: Schema.Attribute.JSON & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
-    quiz: Schema.Attribute.Relation<'manyToOne', 'api::quiz.quiz'>;
-    text: Schema.Attribute.String;
+    quiz: Schema.Attribute.Relation<'manyToOne', 'api::quiz.quiz'> &
+      Schema.Attribute.Required;
+    text: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -662,7 +717,8 @@ export interface ApiQuizAttemptQuizAttempt extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    answers: Schema.Attribute.JSON;
+    answers: Schema.Attribute.JSON & Schema.Attribute.Required;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -673,13 +729,32 @@ export interface ApiQuizAttemptQuizAttempt extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    quiz: Schema.Attribute.Relation<'manyToOne', 'api::quiz.quiz'>;
-    score: Schema.Attribute.Integer;
+    quiz: Schema.Attribute.Relation<'manyToOne', 'api::quiz.quiz'> &
+      Schema.Attribute.Required;
+    score: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     student: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
-    >;
-    totalQuestions: Schema.Attribute.Integer;
+    > &
+      Schema.Attribute.Required;
+    submittedAt: Schema.Attribute.DateTime;
+    totalQuestions: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -697,7 +772,8 @@ export interface ApiQuizQuiz extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'> &
+      Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -706,7 +782,11 @@ export interface ApiQuizQuiz extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
-    title: Schema.Attribute.String;
+    title: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

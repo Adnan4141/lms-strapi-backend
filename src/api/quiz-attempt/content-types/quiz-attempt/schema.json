@@ -15,21 +15,38 @@
     "student": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "plugin::users-permissions.user"
+      "target": "plugin::users-permissions.user",
+      "required": true
     },
     "quiz": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "api::quiz.quiz"
+      "target": "api::quiz.quiz",
+      "required": true
+    },
+    "course": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::course.course"
     },
     "score": {
-      "type": "integer"
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "default": 0
     },
     "totalQuestions": {
-      "type": "integer"
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "default": 0
     },
     "answers": {
-      "type": "json"
+      "type": "json",
+      "required": true
+    },
+    "submittedAt": {
+      "type": "datetime"
     }
   }
 }

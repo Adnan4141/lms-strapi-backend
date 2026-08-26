@@ -12,23 +12,28 @@
   "pluginOptions": {},
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true,
+      "minLength": 3
     },
     "content": {
       "type": "richtext",
-      "default": "DRAFT"
+      "required": true
     },
     "videoUrl": {
       "type": "string"
     },
     "order": {
-      "type": "integer"
+      "type": "integer",
+      "default": 0,
+      "min": 0
     },
     "course": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::course.course",
-      "inversedBy": "lessons"
+      "inversedBy": "lessons",
+      "required": true
     }
   }
 }

@@ -12,22 +12,30 @@
   "pluginOptions": {},
   "attributes": {
     "text": {
-      "type": "string"
+      "type": "string",
+      "required": true,
+      "minLength": 3
     },
     "options": {
-      "type": "json"
+      "type": "json",
+      "required": true
     },
     "correctAnswer": {
-      "type": "integer"
+      "type": "integer",
+      "required": true,
+      "min": 0
     },
     "order": {
-      "type": "integer"
+      "type": "integer",
+      "default": 0,
+      "min": 0
     },
     "quiz": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::quiz.quiz",
-      "inversedBy": "questions"
+      "inversedBy": "questions",
+      "required": true
     }
   }
 }

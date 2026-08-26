@@ -8,18 +8,22 @@
     "description": "Blog Post Content Type"
   },
   "options": {
-    "draftAndPublish": false
+    "draftAndPublish": true
   },
   "pluginOptions": {},
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true,
+      "minLength": 3
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
     },
     "body": {
-      "type": "richtext"
-    },
-    "coverImageUrl": {
-      "type": "string"
+      "type": "richtext",
+      "required": true
     },
     "coverImage": {
       "type": "media",
@@ -35,15 +39,14 @@
         "DRAFT",
         "PUBLISHED"
       ],
-      "default": "DRAFT"
-    },
-    "publishedAt": {
-      "type": "datetime"
+      "default": "DRAFT",
+      "required": true
     },
     "author": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "plugin::users-permissions.user"
+      "target": "plugin::users-permissions.user",
+      "required": true
     }
   }
 }

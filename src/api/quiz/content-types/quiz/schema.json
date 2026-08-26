@@ -12,13 +12,16 @@
   "pluginOptions": {},
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true,
+      "minLength": 3
     },
     "course": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::course.course",
-      "inversedBy": "quizzes"
+      "inversedBy": "quizzes",
+      "required": true
     },
     "questions": {
       "type": "relation",
