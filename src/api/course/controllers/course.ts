@@ -1,14 +1,14 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isCourseOwner } from '../../../utils/auth';
+import { getUserRole, isCourseOwner, StrapiContext } from '../../../utils/auth';
 
-export default factories.createCoreController('api::course.course', ({ strapi }) => ({
-  async create(ctx) {
+export default factories.createCoreController('api::course.course', ({ strapi }): any => ({
+  async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to create courses.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       ctx.request.body.data = {
         ...ctx.request.body.data,
         owner: ctx.state.user.id,
@@ -19,14 +19,14 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     return await super.create(ctx);
   },
 
-  async update(ctx) {
+  async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to update courses.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const isOwner = await isCourseOwner(id, ctx.state.user.id);
       if (!isOwner) {
         return ctx.forbidden('Instructors can only update their own courses.');
@@ -39,14 +39,14 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     return await super.update(ctx);
   },
 
-  async delete(ctx) {
+  async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to delete courses.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const isOwner = await isCourseOwner(id, ctx.state.user.id);
       if (!isOwner) {
         return ctx.forbidden('Instructors can only delete their own courses.');
@@ -56,7 +56,7 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     return await super.delete(ctx);
   },
 
-  async getStats(ctx) {
+  async getStats(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (role !== 'admin') {
       return ctx.forbidden('Only Admin users can access platform statistics.');

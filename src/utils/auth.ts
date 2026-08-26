@@ -1,10 +1,13 @@
 import { Core } from '@strapi/strapi';
+import { StrapiContext } from '../types';
 
-export async function getUserRole(ctx: any): Promise<string> {
-  if (!ctx.state.user) {
+export * from '../types';
+
+export async function getUserRole(ctx: StrapiContext | any): Promise<string> {
+  if (!ctx?.state?.user) {
     return 'public';
   }
-  
+
   // Populate the role to get its type
   const user = await strapi.documents('plugin::users-permissions.user').findOne({
     documentId: ctx.state.user.documentId,
@@ -19,7 +22,7 @@ export async function isCourseOwner(courseId: string | number, userId: string | 
     documentId: String(courseId),
     populate: ['owner'],
   });
-  
+
   return course?.owner?.id === userId;
 }
 
@@ -34,6 +37,6 @@ export async function isEnrolled(courseId: string | number, userId: string | num
       },
     },
   });
-  
+
   return enrollments.length > 0;
 }

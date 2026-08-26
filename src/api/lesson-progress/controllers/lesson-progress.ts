@@ -1,22 +1,24 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole } from '../../../utils/auth';
+import { getUserRole, StrapiContext } from '../../../utils/auth';
 
-export default factories.createCoreController('api::lesson-progress.lesson-progress', ({ strapi }) => ({
-  async create(ctx) {
+export default factories.createCoreController('api::lesson-progress.lesson-progress', ({ strapi }): any => ({
+  async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (role !== 'student') {
       return ctx.forbidden('Only students can create progress records.');
     }
 
-    ctx.request.body.data = {
-      ...ctx.request.body.data,
-      student: ctx.state.user.id,
-    };
+    if (ctx.state.user) {
+      ctx.request.body.data = {
+        ...ctx.request.body.data,
+        student: ctx.state.user.id,
+      };
+    }
 
     return await super.create(ctx);
   },
 
-  async update(ctx) {
+  async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (role !== 'student') {
@@ -32,22 +34,22 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       return ctx.notFound('Progress record not found.');
     }
 
-    if (progress.student?.id !== ctx.state.user.id) {
+    if (ctx.state.user && progress.student?.id !== ctx.state.user.id) {
       return ctx.forbidden('You can only update your own progress records.');
     }
 
-    if (ctx.request.body.data) {
+    if (ctx.state.user && ctx.request.body.data) {
       ctx.request.body.data.student = ctx.state.user.id;
     }
 
     return await super.update(ctx);
   },
 
-  async delete(ctx) {
+  async delete(ctx: StrapiContext) {
     return ctx.forbidden('Deleting progress records is not allowed.');
   },
 
-  async find(ctx) {
+  async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
 
     ctx.query = ctx.query || {};
@@ -55,7 +57,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       return await super.find(ctx);
     }
 
-    if (role === 'student') {
+    if (role === 'student' && ctx.state.user) {
       ctx.query.filters = {
         ...((ctx.query.filters as any) || {}),
         student: {
@@ -65,7 +67,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       return await super.find(ctx);
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const courses = await strapi.documents('api::course.course').findMany({
         filters: { owner: { id: ctx.state.user.id } },
       });
@@ -87,7 +89,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     return ctx.forbidden();
   },
 
-  async findOne(ctx) {
+  async findOne(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
 
@@ -104,14 +106,14 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       return ctx.notFound();
     }
 
-    if (role === 'student') {
+    if (role === 'student' && ctx.state.user) {
       if (progress.student?.id !== ctx.state.user.id) {
         return ctx.forbidden('You can only view your own progress records.');
       }
       return await super.findOne(ctx);
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       if (!progress.lesson || !progress.lesson.course) {
         return ctx.forbidden();
       }
@@ -128,7 +130,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     return ctx.forbidden();
   },
 
-  async getCourseProgress(ctx) {
+  async getCourseProgress(ctx: StrapiContext) {
     const { courseId } = ctx.params;
     const role = await getUserRole(ctx);
 
@@ -152,13 +154,13 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
 
     const lessonIds = lessons.map((l: any) => l.documentId);
 
-    const completedProgress = await strapi.documents('api::lesson-progress.lesson-progress').findMany({
+    const completedProgress = ctx.state.user ? await strapi.documents('api::lesson-progress.lesson-progress').findMany({
       filters: {
         student: { id: ctx.state.user.id },
         isCompleted: true,
         lesson: { documentId: { $in: lessonIds } },
       },
-    });
+    }) : [];
 
     const completedLessons = completedProgress.length;
     const percentage = Math.round((completedLessons / totalLessons) * 100);

@@ -1,14 +1,14 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isCourseOwner, isEnrolled } from '../../../utils/auth';
+import { getUserRole, isCourseOwner, isEnrolled, StrapiContext } from '../../../utils/auth';
 
-export default factories.createCoreController('api::lesson.lesson', ({ strapi }) => ({
-  async create(ctx) {
+export default factories.createCoreController('api::lesson.lesson', ({ strapi }): any => ({
+  async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to create lessons.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const { course: courseId } = ctx.request.body.data || {};
       if (!courseId) {
         return ctx.badRequest('Course ID is required to create a lesson.');
@@ -22,14 +22,14 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     return await super.create(ctx);
   },
 
-  async update(ctx) {
+  async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to update lessons.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const lesson = await strapi.documents('api::lesson.lesson').findOne({
         documentId: id,
         populate: ['course'],
@@ -46,14 +46,14 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     return await super.update(ctx);
   },
 
-  async delete(ctx) {
+  async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to delete lessons.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const lesson = await strapi.documents('api::lesson.lesson').findOne({
         documentId: id,
         populate: ['course'],
@@ -70,13 +70,13 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     return await super.delete(ctx);
   },
 
-  async find(ctx) {
+  async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (['admin', 'content_manager', 'instructor'].includes(role)) {
       return await super.find(ctx);
     }
 
-    if (role === 'student') {
+    if (role === 'student' && ctx.state.user) {
       const enrollments = await strapi.documents('api::enrollment.enrollment').findMany({
         filters: { student: { id: ctx.state.user.id } },
         populate: ['course'],
@@ -100,7 +100,7 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     return ctx.forbidden();
   },
 
-  async findOne(ctx) {
+  async findOne(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
 
@@ -108,7 +108,7 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
       return await super.findOne(ctx);
     }
 
-    if (role === 'student') {
+    if (role === 'student' && ctx.state.user) {
       const lesson = await strapi.documents('api::lesson.lesson').findOne({
         documentId: id,
         populate: ['course'],

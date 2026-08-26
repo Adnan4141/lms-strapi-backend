@@ -1,14 +1,14 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isCourseOwner } from '../../../utils/auth';
+import { getUserRole, isCourseOwner, StrapiContext } from '../../../utils/auth';
 
-export default factories.createCoreController('api::question.question', ({ strapi }) => ({
-  async create(ctx) {
+export default factories.createCoreController('api::question.question', ({ strapi }): any => ({
+  async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to create questions.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const { quiz: quizId } = ctx.request.body.data || {};
       if (!quizId) {
         return ctx.badRequest('Quiz ID is required to create a question.');
@@ -29,14 +29,14 @@ export default factories.createCoreController('api::question.question', ({ strap
     return await super.create(ctx);
   },
 
-  async update(ctx) {
+  async update(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to update questions.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const question = await strapi.documents('api::question.question').findOne({
         documentId: id,
         populate: ['quiz', 'quiz.course'],
@@ -53,14 +53,14 @@ export default factories.createCoreController('api::question.question', ({ strap
     return await super.update(ctx);
   },
 
-  async delete(ctx) {
+  async delete(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager', 'instructor'].includes(role)) {
       return ctx.forbidden('You are not allowed to delete questions.');
     }
 
-    if (role === 'instructor') {
+    if (role === 'instructor' && ctx.state.user) {
       const question = await strapi.documents('api::question.question').findOne({
         documentId: id,
         populate: ['quiz', 'quiz.course'],
@@ -77,7 +77,7 @@ export default factories.createCoreController('api::question.question', ({ strap
     return await super.delete(ctx);
   },
 
-  async find(ctx) {
+  async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     const response = await super.find(ctx);
 
@@ -98,7 +98,7 @@ export default factories.createCoreController('api::question.question', ({ strap
     return response;
   },
 
-  async findOne(ctx) {
+  async findOne(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     const response = await super.findOne(ctx);
 

@@ -33,15 +33,6 @@
         "images"
       ]
     },
-    "status": {
-      "type": "enumeration",
-      "enum": [
-        "DRAFT",
-        "PUBLISHED"
-      ],
-      "default": "DRAFT",
-      "required": true
-    },
     "author": {
       "type": "relation",
       "relation": "manyToOne",

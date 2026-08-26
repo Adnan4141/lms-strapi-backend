@@ -473,9 +473,6 @@ export interface ApiBlogPostBlogPost extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'title'>;
-    status: Schema.Attribute.Enumeration<['DRAFT', 'PUBLISHED']> &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'DRAFT'>;
     title: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
@@ -501,6 +498,7 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     courseStatus: Schema.Attribute.Enumeration<['DRAFT', 'PUBLISHED']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'DRAFT'>;
+    coverImage: Schema.Attribute.Media<'images'>;
     coverImageUrl: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

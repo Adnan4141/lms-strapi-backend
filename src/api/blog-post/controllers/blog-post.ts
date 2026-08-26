@@ -1,9 +1,8 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole } from '../../../utils/auth';
+import { getUserRole, StrapiContext } from '../../../utils/auth';
 
-export default factories.createCoreController('api::blog-post.blog-post', ({ strapi }) => ({
-  async create(ctx) {
-
+export default factories.createCoreController('api::blog-post.blog-post', ({ strapi }): any => ({
+  async create(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
       return ctx.forbidden('Only Admin and Content Manager can create blog posts.');
@@ -11,7 +10,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     return await super.create(ctx);
   },
 
-  async update(ctx) {
+  async update(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
       return ctx.forbidden('Only Admin and Content Manager can update blog posts.');
@@ -19,7 +18,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     return await super.update(ctx);
   },
 
-  async delete(ctx) {
+  async delete(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (!['admin', 'content_manager'].includes(role)) {
       return ctx.forbidden('Only Admin and Content Manager can delete blog posts.');
@@ -27,7 +26,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     return await super.delete(ctx);
   },
 
-  async find(ctx) {
+  async find(ctx: StrapiContext) {
     const role = await getUserRole(ctx);
     if (['admin', 'content_manager'].includes(role)) {
       return await super.find(ctx);
@@ -37,7 +36,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       ctx.query = ctx.query || {};
       ctx.query.filters = {
         ...((ctx.query.filters as any) || {}),
-        status: 'PUBLISHED',
+        publishedAt: { $notNull: true },
       };
       return await super.find(ctx);
     }
@@ -45,7 +44,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     return ctx.forbidden();
   },
 
-  async findOne(ctx) {
+  async findOne(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
 
@@ -58,7 +57,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
         documentId: id,
       });
 
-      if (!post || post.status !== 'PUBLISHED') {
+      if (!post || !post.publishedAt) {
         return ctx.notFound('Blog post not found or not published.');
       }
 
