@@ -542,7 +542,7 @@ export interface ApiEnrollmentEnrollment extends Struct.CollectionTypeSchema {
     singularName: 'enrollment';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'> &
@@ -579,7 +579,7 @@ export interface ApiLessonProgressLessonProgress
     singularName: 'lesson-progress';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     completedAt: Schema.Attribute.DateTime;
@@ -712,7 +712,7 @@ export interface ApiQuizAttemptQuizAttempt extends Struct.CollectionTypeSchema {
     singularName: 'quiz-attempt';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     answers: Schema.Attribute.JSON & Schema.Attribute.Required;

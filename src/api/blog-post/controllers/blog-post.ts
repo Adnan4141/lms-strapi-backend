@@ -32,16 +32,13 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       return await super.find(ctx);
     }
 
-    if (role === 'student') {
-      ctx.query = ctx.query || {};
-      ctx.query.filters = {
-        ...((ctx.query.filters as any) || {}),
-        publishedAt: { $notNull: true },
-      };
-      return await super.find(ctx);
-    }
-
-    return ctx.forbidden();
+    // Anyone (students, instructors, public) can read published blog posts
+    ctx.query = ctx.query || {};
+    ctx.query.filters = {
+      ...((ctx.query.filters as any) || {}),
+      publishedAt: { $notNull: true },
+    };
+    return await super.find(ctx);
   },
 
   async findOne(ctx: StrapiContext) {
@@ -52,18 +49,15 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       return await super.findOne(ctx);
     }
 
-    if (role === 'student') {
-      const post = await strapi.documents('api::blog-post.blog-post').findOne({
-        documentId: id,
-      });
+    // Anyone can read a single published blog post
+    const post = await strapi.documents('api::blog-post.blog-post').findOne({
+      documentId: id,
+    });
 
-      if (!post || !post.publishedAt) {
-        return ctx.notFound('Blog post not found or not published.');
-      }
-
-      return await super.findOne(ctx);
+    if (!post || !post.publishedAt) {
+      return ctx.notFound('Blog post not found or not published.');
     }
 
-    return ctx.forbidden();
+    return await super.findOne(ctx);
   },
 }));

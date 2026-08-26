@@ -143,3 +143,25 @@ export interface StrapiContext {
   send?(data?: any, status?: number): any;
   [key: string]: any;
 }
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
+
+export interface RouteConfig {
+  auth?: boolean | { scope?: string[] } | Record<string, any>;
+  policies?: (string | Record<string, any>)[];
+  middlewares?: (string | Record<string, any>)[];
+  prefix?: string;
+  [key: string]: any;
+}
+
+export interface Route {
+  method: HttpMethod;
+  path: string;
+  handler: string;
+  config?: RouteConfig;
+}
+
+export interface CustomRoutes {
+  routes: Route[];
+}
+

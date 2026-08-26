@@ -1,4 +1,6 @@
-export default {
+import { CustomRoutes } from '../../../types';
+
+const customRoutes: CustomRoutes = {
   routes: [
     {
       method: 'GET',
@@ -11,3 +13,5 @@ export default {
     },
   ],
 };
+
+export default customRoutes;

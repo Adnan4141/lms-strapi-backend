@@ -4,14 +4,14 @@ const customRoutes: CustomRoutes = {
   routes: [
     {
       method: 'GET',
-      path: '/admin-dashboard/stats',
-      handler: 'course.getStats',
+      path: '/quiz/:id/test',
+      handler: 'quiz.test',
       config: {
-        policies: [],
-        middlewares: [],
+        auth: false,
       },
     },
   ],
 };
 
 export default customRoutes;
+

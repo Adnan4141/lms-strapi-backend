@@ -128,4 +128,20 @@ export default factories.createCoreController('api::quiz.quiz', ({ strapi }): an
 
     return ctx.forbidden();
   },
+
+
+
+async test(ctx: StrapiContext) {
+    const { id } = ctx.params;
+    const role = await getUserRole(ctx);
+
+
+    return { message: `Test endpoint accessed by user with role: ${role} for quiz ID: ${id}` };
+}
+
+
+
+
+
+
 }));
