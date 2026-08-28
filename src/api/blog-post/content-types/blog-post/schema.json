@@ -25,6 +25,9 @@
       "type": "richtext",
       "required": true
     },
+    "coverImageUrl": {
+      "type": "string"
+    },
     "coverImage": {
       "type": "media",
       "multiple": false,

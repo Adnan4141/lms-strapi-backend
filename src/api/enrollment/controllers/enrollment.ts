@@ -6,12 +6,30 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
     const role = await getUserRole(ctx);
     if (role !== 'student') {
       strapi.log.warn(`[Security] Non-student user ${ctx.state.user?.id || 'guest'} (role: ${role}) attempted to create an enrollment.`);
-      return ctx.forbidden('Only enrolled students can perform this action.');
+      return ctx.forbidden('Only students can enroll in courses.');
     }
 
     const { course: courseId } = ctx.request.body.data || {};
     if (!courseId) {
       return ctx.badRequest('Course ID is required to enroll.');
+    }
+
+    const numCourseId = Number(courseId);
+    const course = await strapi.db.query('api::course.course').findOne({
+      where: {
+        $and: [
+          {
+            $or: [
+              { documentId: String(courseId) },
+              ...(numCourseId ? [{ id: numCourseId }] : []),
+            ],
+          },
+          { publishedAt: { $notNull: true } },
+        ],
+      },
+    });
+    if (!course) {
+      return ctx.badRequest('This course is not published yet.');
     }
 
     if (ctx.state.user) {
@@ -64,6 +82,25 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       return super.find(ctx);
     }
 
+    if (role === 'instructor' && ctx.state.user) {
+      ctx.query = ctx.query || {};
+      const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
+
+      ctx.query.filters = {
+        $and: [
+          ...existingFilters,
+          {
+            course: {
+              owner: {
+                id: ctx.state.user.id,
+              },
+            },
+          },
+        ],
+      };
+      return super.find(ctx);
+    }
+
     strapi.log.warn(`[Security] Unauthorized find enrollments attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
     return ctx.forbidden();
   },
@@ -97,5 +134,31 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
 
     strapi.log.warn(`[Security] Unauthorized findOne enrollment ${id} attempt by user ${ctx.state.user?.id || 'guest'} (role: ${role})`);
     return ctx.forbidden();
+  },
+
+  async unenrollFromCourse(ctx: StrapiContext) {
+    const { courseId } = ctx.params;
+    const role = await getUserRole(ctx);
+
+    if (role !== 'student' || !ctx.state.user) {
+      return ctx.forbidden('Only students can unenroll from courses.');
+    }
+
+    const enrollment = await strapi.db.query('api::enrollment.enrollment').findOne({
+      where: {
+        student: { id: ctx.state.user.id },
+        course: { documentId: String(courseId) },
+      },
+    });
+
+    if (!enrollment) {
+      return ctx.notFound('You are not enrolled in this course.');
+    }
+
+    await strapi.documents('api::enrollment.enrollment').delete({
+      documentId: enrollment.documentId,
+    });
+
+    ctx.body = { ok: true };
   },
 }));

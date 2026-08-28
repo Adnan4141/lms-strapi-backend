@@ -1,5 +1,6 @@
 import { factories } from '@strapi/strapi';
 import { getUserRole, isEnrolled, StrapiContext } from '../../../utils/auth';
+import { findQuizQuestions, enrichQuizAttemptScores, enrichQuizAttempts, getQuestionCountByQuizIds } from '../../../utils/quiz-questions';
 
 export default factories.createCoreController('api::quiz-attempt.quiz-attempt', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
@@ -15,16 +16,20 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
       return ctx.badRequest('Quiz ID is required to submit a quiz attempt.');
     }
 
-    const quiz = await strapi.documents('api::quiz.quiz').findOne({
-      documentId: quizId,
-      populate: ['course'],
+    const quiz = await strapi.db.query('api::quiz.quiz').findOne({
+      where: { documentId: String(quizId) },
+      populate: {
+        course: {
+          select: ['documentId'],
+        },
+      },
     });
 
-    if (!quiz || !quiz.course) {
+    if (!quiz || !(quiz as any).course) {
       return ctx.notFound('Quiz or associated course not found.');
     }
 
-    const courseId = quiz.course.documentId;
+    const courseId = (quiz as any).course.documentId;
 
     if (ctx.state.user) {
       const enrolled = await isEnrolled(courseId, ctx.state.user.id);
@@ -34,10 +39,10 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
       }
 
   
-      const existingAttempts = await strapi.documents('api::quiz-attempt.quiz-attempt').findMany({
-        filters: {
+      const existingAttempts = await strapi.db.query('api::quiz-attempt.quiz-attempt').findMany({
+        where: {
           student: { id: ctx.state.user.id },
-          quiz: { documentId: quizId },
+          quiz: { documentId: String(quizId) },
         },
       });
 
@@ -50,9 +55,11 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
     let totalQuestions = 0;
 
     if (Array.isArray(answers)) {
-      const questions = await strapi.documents('api::question.question').findMany({
-        filters: { quiz: { documentId: quizId } },
-      });
+      const questions = await findQuizQuestions(strapi, String(quizId), [
+        'documentId',
+        'id',
+        'correctAnswer',
+      ]);
 
       totalQuestions = questions.length;
 
@@ -112,7 +119,20 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
           },
         ],
       };
-      return super.find(ctx);
+
+      await super.find(ctx);
+
+      const attempts = Array.isArray(ctx.body?.data) ? ctx.body.data : [];
+      if (attempts.length === 0) {
+        return ctx.body;
+      }
+
+      ctx.body = {
+        ...ctx.body,
+        data: await enrichQuizAttempts(strapi, attempts),
+      };
+
+      return ctx.body;
     }
 
     if (role === 'instructor' && ctx.state.user) {
@@ -159,7 +179,13 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
         strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to view attempt ${id} of another user.`);
         return ctx.forbidden('You can only view your own quiz attempts.');
       }
-      const sanitized = await this.sanitizeOutput(attempt, ctx);
+
+      const quizDocId = (attempt as any).quiz?.documentId;
+      const questionCountByQuiz = quizDocId
+        ? await getQuestionCountByQuizIds(strapi, [String(quizDocId)])
+        : new Map<string, number>();
+      const enriched = enrichQuizAttemptScores(attempt, questionCountByQuiz);
+      const sanitized = await this.sanitizeOutput(enriched, ctx);
       return this.transformResponse(sanitized);
     }
 
@@ -177,5 +203,84 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
     }
 
     return ctx.forbidden();
+  },
+
+  async getStudentQuizReview(ctx: StrapiContext) {
+    const { quizId } = ctx.params;
+    const role = await getUserRole(ctx);
+
+    if (role !== 'student' || !ctx.state.user) {
+      return ctx.forbidden('Only students can review their quiz attempts.');
+    }
+
+    const attempt = await strapi.db.query('api::quiz-attempt.quiz-attempt').findOne({
+      where: {
+        student: { id: ctx.state.user.id },
+        quiz: { documentId: String(quizId) },
+      },
+      populate: {
+        quiz: {
+          select: ['documentId', 'title'],
+        },
+        course: {
+          select: ['documentId', 'title'],
+        },
+      },
+    });
+
+    if (!attempt) {
+      return ctx.notFound('No submitted attempt found for this quiz.');
+    }
+
+    const questions = await findQuizQuestions(strapi, String(quizId), [
+      'documentId',
+      'text',
+      'options',
+      'correctAnswer',
+      'order',
+      'id',
+    ]);
+
+    const answers = Array.isArray((attempt as any).answers) ? (attempt as any).answers : [];
+    const totalQuestions = questions.length;
+    const score = (attempt as any).score ?? 0;
+
+    const questionReview = questions.map((question: any) => {
+      const selected = answers.find(
+        (answer: any) =>
+          String(answer.questionId) === String(question.documentId) ||
+          String(answer.questionId) === String(question.id)
+      );
+
+      const selectedOption =
+        selected?.selectedOption !== undefined ? Number(selected.selectedOption) : null;
+      const correctOption = Number(question.correctAnswer);
+
+      return {
+        documentId: question.documentId,
+        text: question.text,
+        options: question.options,
+        selectedOption,
+        correctOption,
+        isCorrect: selectedOption !== null && selectedOption === correctOption,
+      };
+    });
+
+    ctx.body = {
+      quiz: {
+        documentId: (attempt as any).quiz?.documentId ?? quizId,
+        title: (attempt as any).quiz?.title ?? 'Quiz',
+      },
+      course: (attempt as any).course
+        ? {
+            documentId: (attempt as any).course.documentId,
+            title: (attempt as any).course.title,
+          }
+        : null,
+      score,
+      totalQuestions,
+      submittedAt: (attempt as any).submittedAt,
+      questions: questionReview,
+    };
   },
 }));

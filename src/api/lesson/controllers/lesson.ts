@@ -1,5 +1,12 @@
 import { factories } from '@strapi/strapi';
 import { getUserRole, isCourseOwner, isEnrolled, StrapiContext } from '../../../utils/auth';
+import { dedupeQuestionsByDocumentId } from '../../../utils/quiz-questions';
+
+function dedupeLessonsByDocumentId<T extends { documentId: string; order?: number; publishedAt?: string | Date | null }>(
+  rows: T[]
+): T[] {
+  return dedupeQuestionsByDocumentId(rows);
+}
 
 export default factories.createCoreController('api::lesson.lesson', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
@@ -132,9 +139,13 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
       return super.findOne(ctx);
     }
 
-    const lesson = await strapi.documents('api::lesson.lesson').findOne({
-      documentId: id,
-      populate: ['course', 'course.owner'],
+    const lesson = await strapi.db.query('api::lesson.lesson').findOne({
+      where: { documentId: String(id) },
+      populate: {
+        course: {
+          populate: ['owner'],
+        },
+      },
     });
 
     if (!lesson || !lesson.course) {
@@ -168,5 +179,67 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     }
 
     return ctx.forbidden();
+  },
+
+  async reorderCourseLessons(ctx: StrapiContext) {
+    const { courseId } = ctx.params;
+    const lessonIds = ctx.request.body?.lessonIds;
+
+    if (!Array.isArray(lessonIds) || lessonIds.length === 0) {
+      return ctx.badRequest('lessonIds must be a non-empty array.');
+    }
+
+    const role = await getUserRole(ctx);
+    if (!['admin', 'content_manager', 'instructor'].includes(role)) {
+      return ctx.forbidden('You do not have permission to reorder lessons.');
+    }
+
+    if (role === 'instructor' && ctx.state.user) {
+      const isOwner = await isCourseOwner(String(courseId), ctx.state.user.id);
+      if (!isOwner) {
+        return ctx.forbidden('Instructors can only reorder lessons in their own courses.');
+      }
+    }
+
+    const rows = await strapi.db.query('api::lesson.lesson').findMany({
+      where: { course: { documentId: String(courseId) } },
+      select: ['documentId', 'order', 'publishedAt'],
+    });
+
+    const lessons = dedupeLessonsByDocumentId(rows);
+    const existingIds = new Set(lessons.map((lesson: any) => String(lesson.documentId)));
+    const requestedIds = lessonIds.map(String);
+
+    if (requestedIds.length !== existingIds.size) {
+      return ctx.badRequest('lessonIds must include every lesson in this course exactly once.');
+    }
+
+    const uniqueRequested = new Set(requestedIds);
+    if (uniqueRequested.size !== requestedIds.length) {
+      return ctx.badRequest('lessonIds cannot contain duplicates.');
+    }
+
+    for (const lessonId of requestedIds) {
+      if (!existingIds.has(lessonId)) {
+        return ctx.badRequest(`Lesson ${lessonId} does not belong to this course.`);
+      }
+    }
+
+    await Promise.all(
+      requestedIds.map((documentId, index) =>
+        strapi.documents('api::lesson.lesson').update({
+          documentId,
+          data: { order: index + 1 },
+        })
+      )
+    );
+
+    ctx.body = {
+      ok: true,
+      lessons: requestedIds.map((documentId, index) => ({
+        documentId,
+        order: index + 1,
+      })),
+    };
   },
 }));
