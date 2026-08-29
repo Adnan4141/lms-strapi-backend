@@ -2,7 +2,7 @@ export interface UserRole {
   id: number;
   name: string;
   description?: string;
-  type: 'admin' | 'content_manager' | 'instructor' | 'student' | string;
+  type: 'admin' | 'content_manager' | 'instructor' | 'student';
 }
 
 export interface AuthUser {

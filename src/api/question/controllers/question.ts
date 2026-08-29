@@ -1,5 +1,5 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isCourseOwner, isEnrolled, StrapiContext } from '../../../utils/auth';
+import { getUserRole, isCourseOwner, StrapiContext } from '../../../utils/auth';
 
 export default factories.createCoreController('api::question.question', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
@@ -114,23 +114,13 @@ export default factories.createCoreController('api::question.question', ({ strap
       return super.find(ctx);
     }
 
-    if (role === 'student' && ctx.state.user) {
-      ctx.query.filters = {
-        $and: [
-          ...existingFilters,
-          {
-            quiz: {
-              course: {
-                publishedAt: { $notNull: true },
-                enrollments: {
-                  student: { id: ctx.state.user.id },
-                },
-              },
-            },
-          },
-        ],
-      };
-      return super.find(ctx);
+    if (role === 'student') {
+      strapi.log.warn(
+        `[Security] Student ${ctx.state.user?.id || 'guest'} attempted direct question list access.`
+      );
+      return ctx.forbidden(
+        'Students must use GET /api/student/courses/:courseId/quizzes/:quizId to access quiz questions.'
+      );
     }
 
     return ctx.forbidden();
@@ -139,6 +129,15 @@ export default factories.createCoreController('api::question.question', ({ strap
   async findOne(ctx: StrapiContext) {
     const { id } = ctx.params;
     const role = await getUserRole(ctx);
+
+    if (role === 'student') {
+      strapi.log.warn(
+        `[Security] Student ${ctx.state.user?.id || 'guest'} attempted direct question access for ${id}.`
+      );
+      return ctx.forbidden(
+        'Students must use GET /api/student/courses/:courseId/quizzes/:quizId to access quiz questions.'
+      );
+    }
 
     if (['admin', 'content_manager'].includes(role)) {
       return super.findOne(ctx);
@@ -160,21 +159,6 @@ export default factories.createCoreController('api::question.question', ({ strap
       if (!isCoursePublished && !isOwner) {
         return ctx.notFound('Question not found or not published.');
       }
-      const sanitized = await this.sanitizeOutput(question, ctx);
-      return this.transformResponse(sanitized);
-    }
-
-    if (role === 'student' && ctx.state.user) {
-      if (!isCoursePublished) {
-        return ctx.notFound('Question not found or not published.');
-      }
-
-      const enrolled = await isEnrolled(question.quiz.course.documentId, ctx.state.user.id);
-      if (!enrolled) {
-        strapi.log.warn(`[Security] Student ${ctx.state.user.id} attempted to view question ${id} without course enrollment.`);
-        return ctx.forbidden('You must be enrolled in this course to view its questions.');
-      }
-
       const sanitized = await this.sanitizeOutput(question, ctx);
       return this.transformResponse(sanitized);
     }

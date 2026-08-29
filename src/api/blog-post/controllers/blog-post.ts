@@ -39,6 +39,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
       ctx.request.body.data = {
         ...ctx.request.body.data,
         author: ctx.request.body.data.author || ctx.state.user.id,
+        publishedAt: null,
       };
     }
 
@@ -143,7 +144,7 @@ export default factories.createCoreController('api::blog-post.blog-post', ({ str
     const role = await getUserRole(ctx);
 
     if (!['admin', 'content_manager'].includes(role)) {
-      return ctx.forbidden('Only staff can access the manage blog list.');
+      return ctx.forbidden('Only administrators and content managers can access the manage blog list.');
     }
 
     const rows = await strapi.db.query('api::blog-post.blog-post').findMany({

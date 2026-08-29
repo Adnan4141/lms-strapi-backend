@@ -1,5 +1,11 @@
 import { factories } from '@strapi/strapi';
-import { getUserRole, isEnrolled, StrapiContext } from '../../../utils/auth';
+import { getUserRole, StrapiContext } from '../../../utils/auth';
+import {
+  createStudentCourseEnrollment,
+  deleteStudentCourseEnrollments,
+  findPublishedCourse,
+  findStudentCourseEnrollments,
+} from '../../../utils/enrollment';
 
 export default factories.createCoreController('api::enrollment.enrollment', ({ strapi }): any => ({
   async create(ctx: StrapiContext) {
@@ -14,33 +20,21 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       return ctx.badRequest('Course ID is required to enroll.');
     }
 
-    const numCourseId = Number(courseId);
-    const course = await strapi.db.query('api::course.course').findOne({
-      where: {
-        $and: [
-          {
-            $or: [
-              { documentId: String(courseId) },
-              ...(numCourseId ? [{ id: numCourseId }] : []),
-            ],
-          },
-          { publishedAt: { $notNull: true } },
-        ],
-      },
-    });
+    const course = await findPublishedCourse(courseId);
     if (!course) {
       return ctx.badRequest('This course is not published yet.');
     }
 
     if (ctx.state.user) {
-      const alreadyEnrolled = await isEnrolled(courseId, ctx.state.user.id);
-      if (alreadyEnrolled) {
+      const existingEnrollments = await findStudentCourseEnrollments(courseId, ctx.state.user.id);
+      if (existingEnrollments.length > 0) {
         return ctx.badRequest('You are already enrolled in this course.');
       }
 
       ctx.request.body.data = {
         ...ctx.request.body.data,
         student: ctx.state.user.id,
+        course: course.id,
         enrolledAt: new Date(),
       };
     }
@@ -144,21 +138,59 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       return ctx.forbidden('Only students can unenroll from courses.');
     }
 
-    const enrollment = await strapi.db.query('api::enrollment.enrollment').findOne({
-      where: {
-        student: { id: ctx.state.user.id },
-        course: { documentId: String(courseId) },
-      },
-    });
+    const deletedCount = await deleteStudentCourseEnrollments(courseId, ctx.state.user.id);
 
-    if (!enrollment) {
+    if (deletedCount === 0) {
       return ctx.notFound('You are not enrolled in this course.');
     }
 
-    await strapi.documents('api::enrollment.enrollment').delete({
-      documentId: enrollment.documentId,
-    });
-
     ctx.body = { ok: true };
+  },
+
+  async getEnrollmentStatus(ctx: StrapiContext) {
+    const { courseId } = ctx.params;
+    const role = await getUserRole(ctx);
+
+    if (role !== 'student' || !ctx.state.user) {
+      return ctx.forbidden('Only students can check course enrollment.');
+    }
+
+    const enrollments = await findStudentCourseEnrollments(courseId, ctx.state.user.id);
+
+    ctx.body = {
+      enrolled: enrollments.length > 0,
+      enrollmentId: enrollments[0]?.documentId ?? null,
+    };
+  },
+
+  async enrollInCourse(ctx: StrapiContext) {
+    const { courseId } = ctx.params;
+    const role = await getUserRole(ctx);
+
+    if (role !== 'student' || !ctx.state.user) {
+      return ctx.forbidden('Only students can enroll in courses.');
+    }
+
+    const existing = await findStudentCourseEnrollments(courseId, ctx.state.user.id);
+    if (existing.length > 0) {
+      ctx.body = {
+        enrolled: true,
+        enrollmentId: existing[0].documentId,
+        message: 'You are already enrolled in this course.',
+      };
+      return;
+    }
+
+    try {
+      const enrollment = await createStudentCourseEnrollment(courseId, ctx.state.user.id);
+      ctx.body = {
+        enrolled: true,
+        enrollmentId: enrollment.documentId,
+        message: 'Enrolled successfully.',
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not enroll in this course.';
+      return ctx.badRequest(message);
+    }
   },
 }));

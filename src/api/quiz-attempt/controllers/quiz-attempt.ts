@@ -109,29 +109,43 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
     const existingFilters = ctx.query.filters ? [ctx.query.filters] : [];
 
     if (role === 'student' && ctx.state.user) {
-      ctx.query.filters = {
-        $and: [
-          ...existingFilters,
-          {
-            student: {
-              id: ctx.state.user.id,
-            },
+      const pagination = (ctx.query.pagination ?? {}) as { page?: string | number; pageSize?: string | number };
+      const pageSize = Math.min(Math.max(Number(pagination.pageSize) || 25, 1), 100);
+      const page = Math.max(Number(pagination.page) || 1, 1);
+      const studentId = ctx.state.user.id;
+
+      const [rows, total] = await Promise.all([
+        strapi.db.query('api::quiz-attempt.quiz-attempt').findMany({
+          where: { student: { id: studentId } },
+          populate: {
+            quiz: { select: ['documentId', 'title'] },
+            course: { select: ['documentId', 'title'] },
           },
-        ],
-      };
+          orderBy: { submittedAt: 'desc' },
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        }),
+        strapi.db.query('api::quiz-attempt.quiz-attempt').count({
+          where: { student: { id: studentId } },
+        }),
+      ]);
 
-      await super.find(ctx);
-
-      const attempts = Array.isArray(ctx.body?.data) ? ctx.body.data : [];
-      if (attempts.length === 0) {
-        return ctx.body;
-      }
+      const enriched = await enrichQuizAttempts(strapi, rows);
+      const sanitized = await Promise.all(
+        enriched.map((attempt) => this.sanitizeOutput(attempt, ctx))
+      );
 
       ctx.body = {
-        ...ctx.body,
-        data: await enrichQuizAttempts(strapi, attempts),
+        data: sanitized,
+        meta: {
+          pagination: {
+            page,
+            pageSize,
+            pageCount: Math.max(Math.ceil(total / pageSize), 1),
+            total,
+          },
+        },
       };
-
       return ctx.body;
     }
 

@@ -5,6 +5,7 @@ import {
   countQuestionsByQuiz,
   findQuizQuestions,
 } from '../../../utils/quiz-questions';
+import { toPublicQuestions } from '../../../utils/question-sanitize';
 
 const ASSIGNABLE_ROLES = ['admin', 'content_manager', 'instructor', 'student'] as const;
 
@@ -515,12 +516,7 @@ export default factories.createCoreController('api::course.course', ({ strapi })
         documentId: course.documentId,
         title: course.title,
       },
-      questions: questions.map((question: any) => ({
-        documentId: question.documentId,
-        text: question.text,
-        options: question.options,
-        order: question.order,
-      })),
+      questions: toPublicQuestions(questions as Record<string, unknown>[]),
       attempt: attempt
         ? {
             score,

@@ -216,8 +216,6 @@ export default {
         'api::lesson-progress.lesson-progress.getCourseProgress',
         'api::quiz.quiz.find',
         'api::quiz.quiz.findOne',
-        'api::question.question.find',
-        'api::question.question.findOne',
         'api::quiz-attempt.quiz-attempt.create',
         'api::quiz-attempt.quiz-attempt.find',
         'api::quiz-attempt.quiz-attempt.findOne',
@@ -269,18 +267,23 @@ export default {
       await Promise.all(allPermPromises);
       console.log('All Roles and Public permissions seeded successfully!');
 
-      const advancedStore = strapi.store({ type: 'plugin', name: 'users-permissions', key: 'advanced' });
-      const storedAdvanced = await advancedStore.get();
+      const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions' });
+      const storedAdvanced = await pluginStore.get({ key: 'advanced' });
       const normalizedAdvanced =
         storedAdvanced && typeof storedAdvanced === 'object' ? storedAdvanced : {};
 
-      await advancedStore.set({
-        ...normalizedAdvanced,
-        unique_email: true,
-        allow_register: true,
-        email_confirmation: false,
-        default_role: 'student',
-      } as Record<string, unknown>);
+      await pluginStore.set({
+        key: 'advanced',
+        value: {
+          ...normalizedAdvanced,
+          unique_email: true,
+          allow_register: true,
+          email_confirmation: false,
+          email_reset_password: null,
+          email_confirmation_redirection: null,
+          default_role: 'student',
+        },
+      });
 
       const authenticatedRole = await strapi.query('plugin::users-permissions.role').findOne({
         where: { type: 'authenticated' },
