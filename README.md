@@ -18,11 +18,15 @@ On bootstrap, the app seeds 4 application roles (admin, content_manager, instruc
 
 ## Demo accounts (after seed)
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@lms.com | Password123! |
-| Instructor | instructor@lms.com | Password123! |
-| Student | student@lms.com | Password123! |
+| Role | Email | Password | Display name |
+|------|-------|----------|--------------|
+| Admin | admin@lms.com | Password123! | Md Mokaddess Hossain Adnan |
+| Content Manager | manager@lms.com | Password123! | Emily Parker |
+| Instructor | instructor@lms.com | Password123! | John Doe |
+| Instructor | cameron@lms.com | Password123! | Robert Watson |
+| Instructor | eleanor@lms.com | Password123! | Sarah Mitchell |
+| Instructor | marcus@lms.com | Password123! | James Cooper |
+| Student | student@lms.com | Password123! | Alex Turner |
 
 ## Environment
 

@@ -303,19 +303,66 @@ export default {
         }
       }
 
-      let studentUser = await strapi.query('plugin::users-permissions.user').findOne({
-        where: { email: 'student@lms.com' },
-      });
-      if (!studentUser) {
-        studentUser = await strapi.plugins['users-permissions'].services.user.add({
-          username: 'alex_turner',
-          email: 'student@lms.com',
-          password: 'Password123!',
-          role: rolesMap['student'].id,
-          confirmed: true,
+      const demoPassword = 'Password123!';
+
+      const ensureDemoUser = async (config: {
+        username: string;
+        email: string;
+        roleType: keyof typeof rolesMap;
+      }) => {
+        let user = await strapi.query('plugin::users-permissions.user').findOne({
+          where: { email: config.email },
         });
-        console.log('Seeded default student user: student@lms.com');
-      }
+
+        if (!user) {
+          user = await strapi.plugins['users-permissions'].services.user.add({
+            username: config.username,
+            email: config.email,
+            password: demoPassword,
+            role: rolesMap[config.roleType].id,
+            confirmed: true,
+          });
+          console.log(`Seeded ${config.roleType} user: ${config.email}`);
+        }
+
+        return user;
+      };
+
+      const adminUser = await ensureDemoUser({
+        username: 'md_mokaddess_hossain_adnan',
+        email: 'admin@lms.com',
+        roleType: 'admin',
+      });
+      await ensureDemoUser({
+        username: 'emily_parker',
+        email: 'manager@lms.com',
+        roleType: 'content_manager',
+      });
+      const instructorUser = await ensureDemoUser({
+        username: 'john_doe',
+        email: 'instructor@lms.com',
+        roleType: 'instructor',
+      });
+      const instructorRobert = await ensureDemoUser({
+        username: 'robert_watson',
+        email: 'cameron@lms.com',
+        roleType: 'instructor',
+      });
+      const instructorSarah = await ensureDemoUser({
+        username: 'sarah_mitchell',
+        email: 'eleanor@lms.com',
+        roleType: 'instructor',
+      });
+      const instructorJames = await ensureDemoUser({
+        username: 'james_cooper',
+        email: 'marcus@lms.com',
+        roleType: 'instructor',
+      });
+      await ensureDemoUser({
+        username: 'alex_turner',
+        email: 'student@lms.com',
+        roleType: 'student',
+      });
 
       // Publish any existing draft courses in database
       const draftCourses = await strapi.documents('api::course.course').findMany({
@@ -327,40 +374,10 @@ export default {
         });
       }
 
-      // Seed Initial Sample Data if less than 3 courses exist
+      // Seed Initial Sample Data if less than 4 courses exist
       const existingCoursesCount = await strapi.documents('api::course.course').count({});
-      if (existingCoursesCount < 3) {
+      if (existingCoursesCount < 4) {
         console.log('Seeding multiple LMS sample courses, lessons, quizzes, and blog posts...');
-
-        // 1. Seed Instructor User
-        let instructorUser = await strapi.query('plugin::users-permissions.user').findOne({
-          where: { email: 'instructor@lms.com' },
-        });
-
-        if (!instructorUser) {
-          instructorUser = await strapi.plugins['users-permissions'].services.user.add({
-            username: 'john_doe',
-            email: 'instructor@lms.com',
-            password: 'Password123!',
-            role: rolesMap['instructor'].id,
-            confirmed: true,
-          });
-        }
-
-        // 2. Seed Admin User
-        let adminUser = await strapi.query('plugin::users-permissions.user').findOne({
-          where: { email: 'admin@lms.com' },
-        });
-
-        if (!adminUser) {
-          adminUser = await strapi.plugins['users-permissions'].services.user.add({
-            username: 'md_mokaddess_hossain_adnan',
-            email: 'admin@lms.com',
-            password: 'Password123!',
-            role: rolesMap['admin'].id,
-            confirmed: true,
-          });
-        }
 
         // --- Course 1: Next.js 16 & Strapi v5 ---
         const course1 = await strapi.documents('api::course.course').create({
@@ -368,7 +385,7 @@ export default {
             title: 'Full-Stack Web Development with Next.js 16 & Strapi v5',
             description: 'Master modern full-stack web application development using Next.js App Router, Server Actions, React 19, and Strapi CMS.',
             coverImageUrl: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97',
-            owner: instructorUser.id,
+            owner: instructorRobert.id,
           },
           status: 'published',
         });
@@ -431,7 +448,7 @@ export default {
             title: 'Node.js & Microservices Architecture Masterclass',
             description: 'Learn to design, build, and deploy resilient asynchronous microservices using Node.js, Express, Docker, and Redis.',
             coverImageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c',
-            owner: instructorUser.id,
+            owner: instructorJames.id,
           },
           status: 'published',
         });
@@ -483,7 +500,7 @@ export default {
             title: 'UI/UX Design Systems & Tailwind CSS v4',
             description: 'Build scalable, accessible component libraries and modern responsive user interfaces with Tailwind CSS v4 and Figma.',
             coverImageUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8',
-            owner: instructorUser.id,
+            owner: instructorSarah.id,
           },
           status: 'published',
         });
@@ -499,9 +516,22 @@ export default {
           status: 'published',
         });
 
-        // --- Seed 6 Comprehensive Blog Posts ---
+        // --- Course 4: Docker & Kubernetes ---
+        await strapi.documents('api::course.course').create({
+          data: {
+            title: 'Docker & Kubernetes',
+            description:
+              'Learn how to build, deploy, and manage modern containerized applications using Docker and Kubernetes. This course covers container fundamentals, Docker images and containers, networking, storage, Docker Compose, Kubernetes architecture, Pods, Deployments, Services, ConfigMaps, Secrets, and application scaling. By the end, students will be able to confidently containerize applications and deploy, manage, and scale them in Kubernetes environments.',
+            coverImageUrl:
+              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRNZLadao95KY1QrFuqSKyEb41Ydcs-JiF1-EyVtxNgYbx0JniYJj6QPe3X&s=10',
+            owner: instructorUser.id,
+          },
+          status: 'published',
+        });
+
+        // --- Seed blog posts (6 published + 1 admin draft) ---
         const existingBlogPosts = await strapi.documents('api::blog-post.blog-post').count({});
-        if (existingBlogPosts < 6) {
+        if (existingBlogPosts < 7) {
           const sampleArticles = [
             {
               title: 'The Future of Web Development: Mastering Next.js 16 and React 19',
@@ -539,6 +569,13 @@ export default {
               body: 'Monolithic content management systems create rigid silos and slow development velocity. Headless CMS solutions like Strapi v5 empower frontend teams with complete presentation freedom while providing editors with an intuitive, role-governed authoring workspace.\n\n### Strapi v5 Advantages:\n- Unified Document Service API\n- Granular Role-Based Access Control (RBAC)\n- Multi-Publish Workflow & Draft Previews\n- Native TypeScript & Modern Plugin Ecosystem',
               author: adminUser.id,
             },
+            {
+              title: 'Launching Next-Generation LMS with Strapi & Next.js',
+              slug: 'launching-next-generation-lms-strapi-nextjs',
+              body: 'Building a production-ready Learning Management System requires strict backend permission enforcement and clean frontend integration...',
+              author: adminUser.id,
+              status: 'draft' as const,
+            },
           ];
 
           for (const article of sampleArticles) {
@@ -546,9 +583,10 @@ export default {
               filters: { slug: article.slug },
             });
             if (!exists) {
+              const { status = 'published', ...articleData } = article;
               await strapi.documents('api::blog-post.blog-post').create({
-                data: article,
-                status: 'published',
+                data: articleData,
+                status,
               });
             }
           }
