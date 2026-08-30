@@ -67,11 +67,13 @@ export default factories.createCoreController('api::quiz-attempt.quiz-attempt', 
         const question = questions.find(
           (q: any) => q.documentId === answer.questionId || q.id === answer.questionId
         );
-
+      /************************************************************* */
         if (question && Number(question.correctAnswer) === Number(answer.selectedOption)) {
           calculatedScore += 1;
         }
       }
+      /************************************************************* */
+
     }
 
     if (ctx.state.user) {

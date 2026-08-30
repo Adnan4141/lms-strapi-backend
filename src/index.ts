@@ -319,6 +319,7 @@ export default {
             username: config.username,
             email: config.email,
             password: demoPassword,
+            provider: 'local',
             role: rolesMap[config.roleType].id,
             confirmed: true,
           });
@@ -327,6 +328,7 @@ export default {
           await strapi.plugins['users-permissions'].services.user.edit(user.id, {
             username: config.username,
             password: demoPassword,
+            provider: 'local',
             role: rolesMap[config.roleType].id,
             confirmed: true,
             blocked: false,

@@ -32,7 +32,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
         return ctx.forbidden('You must be enrolled in the course to record lesson progress.');
       }
 
-      // Guard against duplicate progress records for same (student, lesson)
+     
       const existingProgress = await strapi.documents('api::lesson-progress.lesson-progress').findMany({
         filters: {
           student: { id: ctx.state.user.id },
@@ -41,7 +41,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       });
 
       if (existingProgress.length > 0) {
-        // Update existing progress record instead of creating duplicate row
+      
         const updated = await strapi.documents('api::lesson-progress.lesson-progress').update({
           documentId: existingProgress[0].documentId,
           data: {
@@ -152,7 +152,7 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
       return super.findOne(ctx);
     }
 
-    // Single Query Optimization: Deep populate lesson.course.owner to eliminate 2nd DB call
+
     const progress = await strapi.documents('api::lesson-progress.lesson-progress').findOne({
       documentId: id,
       populate: ['student', 'lesson', 'lesson.course', 'lesson.course.owner'],
@@ -242,7 +242,11 @@ export default factories.createCoreController('api::lesson-progress.lesson-progr
     });
 
     const completedLessons = completedProgress.length;
+    /************************************************************* */
+
     const percentage = Math.round((completedLessons / totalLessons) * 100);
+    
+    /************************************************************* */
 
     return {
       courseId,
