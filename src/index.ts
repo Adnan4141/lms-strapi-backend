@@ -323,6 +323,15 @@ export default {
             confirmed: true,
           });
           console.log(`Seeded ${config.roleType} user: ${config.email}`);
+        } else {
+          await strapi.plugins['users-permissions'].services.user.edit(user.id, {
+            username: config.username,
+            password: demoPassword,
+            role: rolesMap[config.roleType].id,
+            confirmed: true,
+            blocked: false,
+          });
+          console.log(`Synced demo password for ${config.roleType} user: ${config.email}`);
         }
 
         return user;
